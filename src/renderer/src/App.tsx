@@ -10,6 +10,9 @@ import FoldersView from './components/FoldersView'
 import SettingsView from './components/SettingsView'
 import StatusBar from './components/StatusBar'
 import Toasts from './components/Toasts'
+import TitleBar from './components/TitleBar'
+import Skeleton from './components/Skeleton'
+import { usePresence } from './lib/usePresence'
 
 export default function App(): React.JSX.Element {
   const ready = useApp((s) => s.ready)
@@ -34,21 +37,17 @@ export default function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  if (!ready) {
-    return (
-      <div className="empty" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
-        <div>
-          <h3>Loading library…</h3>
-        </div>
-      </div>
-    )
-  }
+  const selectedFont = selectedId ? fonts.find((f) => f.id === selectedId) ?? null : null
+  const { item: selected, leaving } = usePresence(selectedFont)
 
-  const selected = selectedId ? fonts.find((f) => f.id === selectedId) ?? null : null
+  if (!ready) return <Skeleton />
+
   // Browsing a collection is a filter on the grid; editing one is its own view.
   const showGrid = view.kind === 'library'
 
   return (
+    <div className="shell">
+    <TitleBar />
     <div className="app">
       <Sidebar />
 
@@ -57,20 +56,23 @@ export default function App(): React.JSX.Element {
 
         <div className="workspace">
           <div className="content">
-            {showGrid && <FontGrid />}
-            {view.kind === 'collection' && <CollectionsView collectionId={view.id} />}
-            {view.kind === 'providers' && <ProvidersView />}
-            {view.kind === 'folders' && <FoldersView />}
-            {view.kind === 'settings' && <SettingsView />}
+            <div className="view" key={view.kind === 'collection' ? `collection:${view.id}` : view.kind}>
+              {showGrid && <FontGrid />}
+              {view.kind === 'collection' && <CollectionsView collectionId={view.id} />}
+              {view.kind === 'providers' && <ProvidersView />}
+              {view.kind === 'folders' && <FoldersView />}
+              {view.kind === 'settings' && <SettingsView />}
+            </div>
           </div>
 
-          {selected && showGrid && <DetailPanel font={selected} />}
+          {selected && showGrid && <DetailPanel font={selected} leaving={leaving} />}
         </div>
 
         <StatusBar />
       </div>
 
       <Toasts />
+    </div>
     </div>
   )
 }

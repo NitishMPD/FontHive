@@ -80,7 +80,6 @@ export default function CollectionsView({ collectionId }: { collectionId: string
       createdAt: existing?.createdAt ?? Date.now()
     }
     await saveCollection(collection)
-    toast(`Saved “${trimmed}”`, 'success')
     setView({ kind: 'collection', id: collection.id })
   }
 
@@ -217,7 +216,6 @@ export default function CollectionsView({ collectionId }: { collectionId: string
             className="btn danger"
             onClick={() => {
               void deleteCollection(collectionId)
-              toast('Collection deleted')
             }}
           >
             <Icon name="trash" size={14} /> Delete

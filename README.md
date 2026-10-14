@@ -20,6 +20,16 @@ for font parsing.
 - Virtualised grid, so tens of thousands of faces stay smooth
 - Live preview text, adjustable size and column count
 
+**Search**
+- Instant substring matching across family, style and tags
+- Typo-tolerant fallback, so a misspelling like `Giest` still finds `Geist` —
+  including transposed letters, which plain substring search cannot catch
+- The fallback only engages when exact matching finds nothing, so precise
+  searches stay precise, and the status bar marks the result `fuzzy match` so a
+  near-miss is never mistaken for an exact hit
+- Terms of three characters or fewer are never fuzzied, since nearly everything
+  would match
+
 **Providers** — catalogue sources you can browse and download from
 
 | Provider | Families | Notes |
@@ -69,6 +79,7 @@ Other scripts:
 ```bash
 pnpm typecheck       # typecheck main/preload and renderer
 pnpm check:providers # verify provider catalogues and the native binding
+pnpm check:fuzzy     # typo-tolerant search: behaviour and performance
 ```
 
 > **Running from a terminal launched by another Electron app (such as DSH):**

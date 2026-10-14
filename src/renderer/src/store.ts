@@ -23,6 +23,7 @@ export interface Toast {
   id: number
   text: string
   tone: 'info' | 'success' | 'error'
+  leaving?: boolean
 }
 
 interface AppState {
@@ -77,6 +78,18 @@ interface AppState {
 
 let toastSeq = 0
 
+/**
+ * Provider counts are derived from the library rather than trusted from the
+ * main process, so a rescan that adds or removes faces cannot leave the sidebar
+ * showing a stale number.
+ */
+function withCounts(providers: ProviderInfo[], fonts: FontRecord[]): ProviderInfo[] {
+  if (!providers.length) return providers
+  const counts = new Map<string, number>()
+  for (const font of fonts) counts.set(font.provider, (counts.get(font.provider) ?? 0) + 1)
+  return providers.map((provider) => ({ ...provider, count: counts.get(provider.id) ?? 0 }))
+}
+
 export const useApp = create<AppState>((set, get) => ({
   ready: false,
   fonts: [],
@@ -84,7 +97,7 @@ export const useApp = create<AppState>((set, get) => ({
   folders: [],
   providers: [],
   settings: {
-    previewText: 'Sphinx of black quartz, judge my vow',
+    previewText: '',
     previewSize: 34,
     gridColumns: 3,
     cacheDir: '',
@@ -109,13 +122,16 @@ export const useApp = create<AppState>((set, get) => ({
       fonts: boot.fonts,
       collections: boot.collections,
       folders: boot.folders,
-      providers: boot.providers,
+      providers: withCounts(boot.providers, boot.fonts),
       settings: boot.settings,
       platform: boot.platform
     })
 
     window.api.onProgress((progress) => set({ progress }))
-    window.api.onLibraryChanged((fonts) => set({ fonts }))
+    // Re-derive provider counts so the sidebar can never disagree with the grid.
+    window.api.onLibraryChanged((fonts) =>
+      set((state) => ({ fonts, providers: withCounts(state.providers, fonts) }))
+    )
   },
 
   setFilters: (patch) => set({ filters: { ...get().filters, ...patch } }),
@@ -156,8 +172,6 @@ export const useApp = create<AppState>((set, get) => ({
           `${result.changed.length} activated, ${result.failed.length} failed: ${result.failed[0].error}`,
           'error'
         )
-      } else {
-        get().toast(`Activated ${result.changed.length} font${result.changed.length > 1 ? 's' : ''}`, 'success')
       }
     } catch (err) {
       get().toast((err as Error).message, 'error')
@@ -170,8 +184,7 @@ export const useApp = create<AppState>((set, get) => ({
     if (!ids.length) return
     set({ busy: `Deactivating ${ids.length}…` })
     try {
-      const result = await window.api.deactivate(ids)
-      get().toast(`Deactivated ${result.changed.length} font${result.changed.length > 1 ? 's' : ''}`, 'success')
+      await window.api.deactivate(ids)
     } catch (err) {
       get().toast((err as Error).message, 'error')
     } finally {
@@ -187,11 +200,7 @@ export const useApp = create<AppState>((set, get) => ({
   async rescan() {
     set({ busy: 'Scanning font folders…' })
     try {
-      const result = await window.api.rescan()
-      get().toast(
-        `Scanned ${result.scanned} faces — ${result.added} added, ${result.updated} updated, ${result.removed} removed`,
-        'success'
-      )
+      await window.api.rescan()
       set({ folders: (await window.api.bootstrap()).folders })
     } catch (err) {
       get().toast((err as Error).message, 'error')
@@ -207,7 +216,6 @@ export const useApp = create<AppState>((set, get) => ({
       set({ providers })
       const info = providers.find((p) => p.id === id)
       if (info?.error) get().toast(info.error, 'error')
-      else get().toast(`Catalogue ready — ${info?.count ?? 0} faces`, 'success')
     } catch (err) {
       get().toast((err as Error).message, 'error')
     } finally {
@@ -220,7 +228,7 @@ export const useApp = create<AppState>((set, get) => ({
     set({ busy: `Downloading ${ids.length}…` })
     try {
       const result = await window.api.downloadMany(ids)
-      get().toast(`Downloaded ${result.ok}, ${result.failed} failed`, result.failed ? 'error' : 'success')
+      if (result.failed) get().toast(`Downloaded ${result.ok}, ${result.failed} failed`, 'error')
     } catch (err) {
       get().toast((err as Error).message, 'error')
     } finally {
@@ -279,6 +287,7 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   dismissToast(id) {
-    set({ toasts: get().toasts.filter((t) => t.id !== id) })
+    set({ toasts: get().toasts.map((t) => (t.id === id ? { ...t, leaving: true } : t)) })
+    setTimeout(() => set({ toasts: get().toasts.filter((t) => t.id !== id) }), 180)
   }
 }))

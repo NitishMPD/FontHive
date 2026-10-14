@@ -4,7 +4,7 @@ import { useApp } from '../store'
 import { defaultAxisValues, ensureFontLoaded, variationSettings } from '../lib/fontface'
 import Icon from './Icon'
 
-export default function DetailPanel({ font }: { font: FontRecord }): React.JSX.Element {
+export default function DetailPanel({ font, leaving }: { font: FontRecord; leaving: boolean }): React.JSX.Element {
   const settings = useApp((s) => s.settings)
   const collections = useApp((s) => s.collections)
   const axisValues = useApp((s) => s.axisValues[font.id])
@@ -50,7 +50,7 @@ export default function DetailPanel({ font }: { font: FontRecord }): React.JSX.E
   }
 
   return (
-    <aside className="detail">
+    <aside className={`detail ${leaving ? 'leaving' : ''}`}>
       <div className="detail-head">
         <div style={{ flex: 1, minWidth: 0 }}>
           <h2>{font.family}</h2>

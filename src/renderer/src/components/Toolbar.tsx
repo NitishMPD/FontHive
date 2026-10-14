@@ -65,7 +65,7 @@ export default function Toolbar(): React.JSX.Element {
           />
         </div>
 
-        <Dropdown label="Categories" count={filters.categories.length}>
+        <Dropdown icon="layers" label="Categories" count={filters.categories.length}>
           {CATEGORIES.map((category) => (
             <label className="dd-item" key={category}>
               <input
@@ -78,7 +78,7 @@ export default function Toolbar(): React.JSX.Element {
           ))}
         </Dropdown>
 
-        <Dropdown label="Properties" count={propertyCount}>
+        <Dropdown icon="filter" label="Properties" count={propertyCount}>
           {PROPERTIES.map((p) => (
             <label className="dd-item" key={p.key}>
               <input
@@ -127,7 +127,7 @@ export default function Toolbar(): React.JSX.Element {
           </button>
         </div>
 
-        <Dropdown label={`Sort: ${SORTS.find((s) => s.key === filters.sort)?.label}`} closeOnPick>
+        <Dropdown icon="sort" label={SORTS.find((s) => s.key === filters.sort)?.label ?? 'Sort'} closeOnPick>
           {SORTS.map((s) => (
             <button
               key={s.key}
@@ -154,17 +154,17 @@ export default function Toolbar(): React.JSX.Element {
           {selection.length > 0 && (
             <>
               <strong style={{ fontSize: 12.5 }}>{selection.length} selected</strong>
-              <button className="btn sm" disabled={Boolean(busy)} onClick={() => void activate(selection)}>
-                <Icon name="check" size={13} /> Activate
+              <button className="btn sm" title="Activate" disabled={Boolean(busy)} onClick={() => void activate(selection)}>
+                <Icon name="check" size={14} />
               </button>
-              <button className="btn sm" disabled={Boolean(busy)} onClick={() => void deactivate(selection)}>
-                Deactivate
+              <button className="btn sm" title="Deactivate" disabled={Boolean(busy)} onClick={() => void deactivate(selection)}>
+                <Icon name="power" size={14} />
               </button>
-              <button className="btn sm" disabled={Boolean(busy)} onClick={() => void download(selection)}>
-                <Icon name="download" size={13} /> Download
+              <button className="btn sm" title="Download" disabled={Boolean(busy)} onClick={() => void download(selection)}>
+                <Icon name="download" size={14} />
               </button>
-              <button className="btn sm ghost" onClick={clearSelection}>
-                Clear
+              <button className="btn sm ghost" title="Clear selection" onClick={clearSelection}>
+                <Icon name="close" size={14} />
               </button>
             </>
           )}

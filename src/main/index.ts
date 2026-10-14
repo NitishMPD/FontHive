@@ -78,16 +78,28 @@ function providerInfos(): ProviderInfo[] {
   const counts = new Map<ProviderId, number>()
   for (const font of store.fonts) counts.set(font.provider, (counts.get(font.provider) ?? 0) + 1)
 
-  return (Object.keys(providerNames) as ProviderId[]).map((id) => ({
-    id,
-    name: providerNames[id],
-    count: counts.get(id) ?? 0,
-    remote: isRemoteProvider(id),
-    status: providerStatus[id],
-    error: providerErrors[id],
-    attribution: isRemoteProvider(id) ? remoteProviders[id].attribution : 'Your own folders and system fonts',
-    homepage: isRemoteProvider(id) ? remoteProviders[id].homepage : undefined
-  }))
+  return (Object.keys(providerNames) as ProviderId[]).map((id) => {
+    const count = counts.get(id) ?? 0
+    // In-memory status resets on launch, but an indexed catalogue persists. Report
+    // a populated provider as ready rather than implying it still needs fetching.
+    const status: ProviderInfo['status'] =
+      providerStatus[id] === 'idle' && isRemoteProvider(id) && count > 0
+        ? 'ready'
+        : providerStatus[id]
+
+    return {
+      id,
+      name: providerNames[id],
+      count,
+      remote: isRemoteProvider(id),
+      status,
+      error: providerErrors[id],
+      attribution: isRemoteProvider(id)
+        ? remoteProviders[id].attribution
+        : 'Your own folders and system fonts',
+      homepage: isRemoteProvider(id) ? remoteProviders[id].homepage : undefined
+    }
+  })
 }
 
 /* ------------------------------------------------------------------ */
@@ -442,6 +454,10 @@ function registerIpc(): void {
   ipcMain.handle('save-settings', (_e, patch: Partial<AppSettings>) => store.setSettings(patch))
   ipcMain.handle('open-external', (_e, url: string) => shell.openExternal(url))
 
+  ipcMain.handle('set-title-bar-theme', (_e, color: string, symbolColor: string) => {
+    win?.setTitleBarOverlay({ color, symbolColor, height: TITLE_BAR_HEIGHT })
+  })
+
   ipcMain.handle('reveal-font', (_e, id: string) => {
     const font = store.fonts.find((f) => f.id === id)
     if (font?.filePath) shell.showItemInFolder(font.filePath)
@@ -481,6 +497,8 @@ async function dialogShowOpenDialog(): Promise<string | null> {
 /* Window                                                              */
 /* ------------------------------------------------------------------ */
 
+const TITLE_BAR_HEIGHT = 40
+
 function createWindow(): void {
   win = new BrowserWindow({
     width: 1440,
@@ -488,9 +506,12 @@ function createWindow(): void {
     minWidth: 1040,
     minHeight: 680,
     show: false,
-    backgroundColor: '#0e1013',
+    backgroundColor: '#0b0b0c',
     title: 'Font Hive',
-    autoHideMenuBar: true,
+    icon: path.join(app.getAppPath(), 'resources/icon.png'),
+    // Custom title bar: the renderer draws the drag area, Windows draws the caption buttons.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#101011', symbolColor: '#a8a296', height: TITLE_BAR_HEIGHT },
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,

@@ -40,6 +40,8 @@ const api: FontManagerApi = {
 
   saveSettings: (patch: Partial<AppSettings>) => ipcRenderer.invoke('save-settings', patch),
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
+  setTitleBarTheme: (color: string, symbolColor: string) =>
+    ipcRenderer.invoke('set-title-bar-theme', color, symbolColor),
   revealFont: (id: string) => ipcRenderer.invoke('reveal-font', id),
   uninstallFontFile: (id: string) => ipcRenderer.invoke('uninstall-font-file', id),
 

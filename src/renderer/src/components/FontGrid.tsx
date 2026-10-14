@@ -17,6 +17,8 @@ export default function FontGrid(): React.JSX.Element {
   const selectedId = useApp((s) => s.selectedId)
   const selection = useApp((s) => s.selection)
   const refreshProvider = useApp((s) => s.refreshProvider)
+  const providers = useApp((s) => s.providers)
+  const setFilters = useApp((s) => s.setFilters)
   const view = useApp((s) => s.view)
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -39,7 +41,7 @@ export default function FontGrid(): React.JSX.Element {
     if (el) setWidth(el.clientWidth)
   }, [selectedId])
 
-  const visible = useMemo(
+  const { fonts: visible } = useMemo(
     () => applyFilters(fonts, filters, collections),
     [fonts, filters, collections]
   )
@@ -69,26 +71,68 @@ export default function FontGrid(): React.JSX.Element {
 
   if (visible.length === 0) {
     const isCollection = view.kind === 'collection'
-    const providerFiltered = filters.providers.length > 0
+    const activeProviderId = filters.providers.length === 1 ? filters.providers[0] : null
+    const activeProvider = activeProviderId
+      ? (providers.find((p) => p.id === activeProviderId) ?? null)
+      : null
+
+    // A catalogue is only genuinely missing when it holds no faces at all. An
+    // empty grid beside a populated source is a search/filter problem, and
+    // offering a fetch there sends the user to re-download a catalogue they
+    // already have.
+    const catalogueMissing = activeProvider !== null && activeProvider.count === 0
+
+    const message = catalogueMissing
+      ? 'This catalogue source has not been fetched yet.'
+      : isCollection
+        ? 'This collection has no matching fonts.'
+        : fonts.length === 0
+          ? 'No fonts indexed yet. Add a folder or fetch a catalogue source.'
+          : 'No fonts match the current search and filters.'
+
+    const hasActiveFilters = Boolean(
+      filters.query ||
+        filters.providers.length ||
+        filters.categories.length ||
+        filters.onlyActive ||
+        filters.onlyInstalled ||
+        filters.variableOnly ||
+        filters.onlyFavorites ||
+        filters.collectionId
+    )
+
     return (
       <div className="empty">
         <Icon name="library" size={30} />
         <h3 style={{ marginTop: 12 }}>Nothing to show</h3>
-        <p>
-          {providerFiltered
-            ? 'This catalogue source has not been fetched yet.'
-            : isCollection
-              ? 'This collection has no matching fonts.'
-              : fonts.length === 0
-                ? 'No fonts indexed yet. Add a folder or fetch a catalogue source.'
-                : 'No fonts match the current search and filters.'}
-        </p>
-        {providerFiltered && (
+        <p>{message}</p>
+
+        {catalogueMissing && activeProviderId && (
           <button
             className="btn primary"
-            onClick={() => void refreshProvider(filters.providers[0] as ProviderId)}
+            onClick={() => void refreshProvider(activeProviderId as ProviderId)}
           >
-            <Icon name="download" size={14} /> Fetch {filters.providers[0]} catalogue
+            <Icon name="download" size={14} /> Fetch {activeProviderId} catalogue
+          </button>
+        )}
+
+        {!catalogueMissing && hasActiveFilters && (
+          <button
+            className="btn"
+            onClick={() =>
+              setFilters({
+                query: '',
+                providers: [],
+                categories: [],
+                onlyActive: false,
+                onlyInstalled: false,
+                variableOnly: false,
+                onlyFavorites: false,
+                collectionId: null
+              })
+            }
+          >
+            <Icon name="close" size={14} /> Clear filters
           </button>
         )}
       </div>

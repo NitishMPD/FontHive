@@ -207,6 +207,7 @@ export interface FontManagerApi {
   saveSettings(patch: Partial<AppSettings>): Promise<AppSettings>
   openExternal(url: string): Promise<void>
   revealFont(id: string): Promise<void>
+  setTitleBarTheme(color: string, symbolColor: string): Promise<void>
   uninstallFontFile(id: string): Promise<FontRecord>
 
   onProgress(cb: (progress: Progress) => void): () => void

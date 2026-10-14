@@ -56,7 +56,7 @@ const SCHEMA_VERSION = 2
 
 export function defaultSettings(): AppSettings {
   return {
-    previewText: 'Sphinx of black quartz, judge my vow',
+    previewText: '',
     previewSize: 34,
     gridColumns: 3,
     cacheDir: path.join(app.getPath('userData'), 'font-cache'),

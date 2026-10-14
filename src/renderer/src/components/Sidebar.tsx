@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import { useApp } from '../store'
 import Icon from './Icon'
-import Logo from './Logo'
 import type { ProviderId } from '@shared/types'
 
 const PROVIDER_ORDER: ProviderId[] = ['local', 'google', 'fontsource', 'bunny']
@@ -28,11 +27,6 @@ export default function Sidebar(): React.JSX.Element {
 
   return (
     <aside className="sidebar">
-      <div className="brand">
-        <Logo />
-        <h1>Font Hive</h1>
-      </div>
-
       <nav className="nav">
         <button
           className={`nav-item ${onLibrary && !filters.providers.length && !filters.onlyActive && !filters.onlyFavorites && !filters.collectionId ? 'active' : ''}`}
@@ -147,7 +141,7 @@ export default function Sidebar(): React.JSX.Element {
       <div className="sidebar-footer">
         <button className="btn" onClick={() => void rescan()} disabled={Boolean(busy)}>
           <Icon name="refresh" size={14} className={busy ? 'spin' : undefined} />
-          Rescan folders
+          Rescan
         </button>
       </div>
     </aside>

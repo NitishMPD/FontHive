@@ -25,6 +25,11 @@ export type IconName =
   | 'grid'
   | 'list'
   | 'chevron'
+  | 'sun'
+  | 'moon'
+  | 'filter'
+  | 'sort'
+  | 'power'
 
 const PATHS: Record<IconName, string> = {
   library: 'M4 5h6v14H4zM14 5h6v14h-6z',
@@ -45,6 +50,11 @@ const PATHS: Record<IconName, string> = {
   heart: 'M12 20s-7-4.5-9-9a5 5 0 019-3 5 5 0 019 3c-2 4.5-9 9-9 9z',
   grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
   list: 'M4 6h16M4 12h16M4 18h16',
+  sun: 'M12 8a4 4 0 100 8 4 4 0 000-8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+  moon: 'M21 13A9 9 0 1111 3a7 7 0 0010 10z',
+  filter: 'M3 5h18l-7 8v6l-4-2v-4z',
+  sort: 'M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3',
+  power: 'M12 3v9M6.4 6.4a8 8 0 1011.2 0',
   chevron: 'M6 9l6 6 6-6',
   external: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5'
 }

@@ -9,7 +9,7 @@ export default function Toasts(): React.JSX.Element {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className={`toast ${toast.tone === 'error' ? 'error' : toast.tone === 'success' ? 'success' : ''}`}
+          className={`toast ${toast.tone} ${toast.leaving ? 'leaving' : ''}`}
           onClick={() => dismiss(toast.id)}
           role="status"
         >

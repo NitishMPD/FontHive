@@ -97,11 +97,121 @@ function matchesQuery(font: FontRecord, query: string): boolean {
   return terms.every((term) => haystack.includes(term))
 }
 
+/* ------------------------------------------------------------------ *
+ * Typo-tolerant fallback
+ *
+ * Only runs when strict matching returns nothing, so exact search stays
+ * crisp and the extra cost is paid only on a likely misspelling. The
+ * distance is Damerau-Levenshtein (optimal string alignment), which
+ * counts an adjacent transposition as one edit — that is what makes
+ * "Giest" find "Geist".
+ * ------------------------------------------------------------------ */
+
+function editDistance(a: string, b: string, max: number): number {
+  if (a === b) return 0
+  if (Math.abs(a.length - b.length) > max) return max + 1
+
+  let prev2: number[] = []
+  let prev: number[] = Array.from({ length: b.length + 1 }, (_, j) => j)
+
+  for (let i = 1; i <= a.length; i++) {
+    const cur: number[] = new Array(b.length + 1)
+    cur[0] = i
+    let rowMin = cur[0]
+
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      let value = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+
+      // Adjacent transposition, e.g. "gi|e" vs "ge|i".
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        value = Math.min(value, prev2[j - 2] + 1)
+      }
+
+      cur[j] = value
+      if (value < rowMin) rowMin = value
+    }
+
+    // Every remaining row can only grow, so bail out early.
+    if (rowMin > max) return max + 1
+
+    prev2 = prev
+    prev = cur
+  }
+
+  return prev[b.length]
+}
+
+/** Shorter terms are too ambiguous to correct safely. */
+function maxDistanceFor(term: string): number {
+  if (term.length <= 3) return 0
+  if (term.length <= 6) return 1
+  return 2
+}
+
+function words(font: FontRecord): string[] {
+  return `${font.family} ${font.subfamily} ${font.postScriptName}`
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+}
+
+function fuzzyMatchesTerms(font: FontRecord, terms: string[]): boolean {
+  const parts = words(font)
+  return terms.every((term) => {
+    const max = maxDistanceFor(term)
+    return parts.some((part) => {
+      if (part.includes(term)) return true
+      if (max === 0) return false
+      if (Math.abs(part.length - term.length) > max) return false
+      return editDistance(term, part, max) <= max
+    })
+  })
+}
+
+export interface FilterResult {
+  fonts: FontRecord[]
+  /** Strict matching found nothing, so these came from typo-tolerant matching. */
+  fuzzy: boolean
+}
+
+let memoFonts: FontRecord[] | null = null
+let memoFilters: Filters | null = null
+let memoCollections: Collection[] | null = null
+let memoResult: FilterResult | null = null
+
+/**
+ * Both the grid and the status bar request the filtered set on every render.
+ * The inputs are reference-stable between changes, so memoising here makes the
+ * second request free rather than repeating a 25k-face pass.
+ */
 export function applyFilters(
   fonts: FontRecord[],
   filters: Filters,
   collections: Collection[]
-): FontRecord[] {
+): FilterResult {
+  if (
+    memoResult &&
+    fonts === memoFonts &&
+    filters === memoFilters &&
+    collections === memoCollections
+  ) {
+    return memoResult
+  }
+
+  const result = computeFilters(fonts, filters, collections)
+  memoFonts = fonts
+  memoFilters = filters
+  memoCollections = collections
+  memoResult = result
+  return result
+}
+
+function computeFilters(
+  fonts: FontRecord[],
+  filters: Filters,
+  collections: Collection[]
+): FilterResult {
   let pool = fonts
 
   if (filters.collectionId) {
@@ -109,8 +219,7 @@ export function applyFilters(
     if (collection) pool = collectionMembers(pool, collection)
   }
 
-  const matched = pool.filter((font) => {
-    if (!matchesQuery(font, filters.query)) return false
+  const passesFacets = (font: FontRecord): boolean => {
     if (filters.providers.length && !filters.providers.includes(font.provider)) return false
     if (filters.categories.length && !filters.categories.includes(font.category)) return false
     if (filters.onlyActive && !font.active) return false
@@ -118,7 +227,9 @@ export function applyFilters(
     if (filters.variableOnly && !font.axes.length) return false
     if (filters.onlyFavorites && !font.favorite) return false
     return true
-  })
+  }
+
+  const candidates = pool.filter(passesFacets)
 
   const byName = (a: FontRecord, b: FontRecord): number =>
     a.family.localeCompare(b.family) || a.weight - b.weight
@@ -127,7 +238,27 @@ export function applyFilters(
     newest: (a, b) => b.addedAt - a.addedAt || byName(a, b),
     weight: (a, b) => a.weight - b.weight || byName(a, b)
   }
-  return matched.sort(order[filters.sort])
+
+  const strict = candidates.filter((font) => matchesQuery(font, filters.query))
+  if (strict.length > 0 || !filters.query.trim()) {
+    return { fonts: strict.sort(order[filters.sort]), fuzzy: false }
+  }
+
+  // Nothing matched exactly, so retry tolerating typos. Each family is scored
+  // once and cached: thousands of faces share one family name, so this cuts the
+  // work from ~25k comparisons to a few thousand.
+  const terms = filters.query.toLowerCase().split(/\s+/).filter(Boolean)
+  const familyHit = new Map<string, boolean>()
+  const fuzzy = candidates.filter((font) => {
+    let hit = familyHit.get(font.family)
+    if (hit === undefined) {
+      hit = fuzzyMatchesTerms(font, terms)
+      familyHit.set(font.family, hit)
+    }
+    return hit
+  })
+
+  return { fonts: fuzzy.sort(order[filters.sort]), fuzzy: true }
 }
 
 export const CATEGORIES = [

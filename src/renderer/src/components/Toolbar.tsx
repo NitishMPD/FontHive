@@ -57,6 +57,7 @@ export default function Toolbar(): React.JSX.Element {
     <header className="toolbar">
       <div className="toolbar-row">
         <div className="search">
+          <Icon name="search" size={15} className="search-icon" />
           <input
             value={filters.query}
             placeholder="Search fonts, designers, or styles…"

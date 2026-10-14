@@ -1,0 +1,6 @@
+node_modules/
+out/
+dist/
+*.tsbuildinfo
+tools/*.built.cjs
+.DS_Store

@@ -1,0 +1,32 @@
+{
+  "name": "fb-rea",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal font manager: indexed library, pluggable providers, granular activation",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "check:providers": "esbuild tools/provider-check.ts --bundle --platform=node --format=cjs --target=node20 --outfile=tools/provider-check.built.cjs --external:fontkit --external:koffi --log-level=error && node tools/provider-check.built.cjs"
+  },
+  "dependencies": {
+    "fontkit": "^2.0.4",
+    "koffi": "^2.9.0"
+  },
+  "devDependencies": {
+    "@tanstack/react-virtual": "^3.11.2",
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.3.1",
+    "electron-vite": "^2.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "zustand": "^5.0.3"
+  }
+}

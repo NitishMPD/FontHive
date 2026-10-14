@@ -48,3 +48,13 @@
 - Added `master` to the trigger, retained `main`, and updated README and design.
 - Parsed the workflow YAML and asserted both branch triggers; whitespace checks
   passed. No build, commit, push, or workflow execution was performed.
+
+## Completed: CI dependency script policy fix
+
+- The first release run failed at installation with `ERR_PNPM_IGNORED_BUILDS`
+  because Electron Builder's `electron-winstaller` dependency was unreviewed.
+- Explicitly disabled its Squirrel-specific install script in
+  `pnpm-workspace.yaml`; the application packages with NSIS instead.
+- `pnpm install --frozen-lockfile` passes locally. Configuration assertions
+  confirm the unused script is denied and Electron, esbuild, and Koffi remain
+  approved. Whitespace checks passed. No application build or push was run.

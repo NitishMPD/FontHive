@@ -1,7 +1,13 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import fontkit from 'fontkit'
-import type { FontCategory, FontFormat, FontStyle, VariationAxis } from '@shared/types'
+import type {
+  FontCategory,
+  FontFormat,
+  FontMetrics,
+  FontStyle,
+  VariationAxis
+} from '@shared/types'
 
 export interface ParsedFace {
   family: string
@@ -15,6 +21,7 @@ export interface ParsedFace {
   license?: string
   designer?: string
   copyright?: string
+  metrics?: FontMetrics
   category: FontCategory
 }
 
@@ -127,7 +134,17 @@ interface FontkitFont {
   italicAngle?: number
   post?: { isFixedPitch?: number }
   fonts?: FontkitFont[]
-  'OS/2'?: { usWeightClass?: number; panose?: unknown }
+  'OS/2'?: {
+    usWeightClass?: number
+    panose?: unknown
+    // fontkit normalises the OpenType sxHeight/sCapHeight names.
+    xHeight?: number
+    capHeight?: number
+    sxHeight?: number
+    sCapHeight?: number
+  }
+  head?: { unitsPerEm?: number }
+  unitsPerEm?: number
 }
 
 function weightFromSubfamily(subfamily: string): number {
@@ -141,6 +158,25 @@ function weightFromSubfamily(subfamily: string): number {
   if (/\b(black|heavy)\b/.test(s)) return 900
   if (/\bbold\b/.test(s)) return 700
   return 400
+}
+
+/**
+ * Vertical proportions as a fraction of the em square. These are version 2+
+ * OS/2 fields, so older fonts legitimately report nothing.
+ */
+function parseMetrics(font: FontkitFont): FontMetrics | undefined {
+  const unitsPerEm = font.head?.unitsPerEm ?? font.unitsPerEm
+  if (!unitsPerEm || unitsPerEm <= 0) return undefined
+
+  const os2 = font['OS/2']
+  const ratio = (value: number | undefined): number | undefined =>
+    typeof value === 'number' && value > 0 ? Number((value / unitsPerEm).toFixed(4)) : undefined
+
+  // fontkit exposes these as xHeight/capHeight; the raw OpenType names are kept
+  // as a fallback in case that normalisation ever changes.
+  const xHeight = ratio(os2?.xHeight ?? os2?.sxHeight)
+  const capHeight = ratio(os2?.capHeight ?? os2?.sCapHeight)
+  return xHeight === undefined && capHeight === undefined ? undefined : { xHeight, capHeight }
 }
 
 function faceFrom(font: FontkitFont, fallbackName: string): ParsedFace {
@@ -166,6 +202,7 @@ function faceFrom(font: FontkitFont, fallbackName: string): ParsedFace {
     license: font.license,
     designer: font.designer,
     copyright: font.copyright,
+    metrics: parseMetrics(font),
     category: deriveCategory(family, subfamily, font['OS/2']?.panose, isFixedPitch)
   }
 }

@@ -53,6 +53,7 @@ export function catalogToRecords(provider: ProviderId, faces: CatalogFace[]): Fo
       axes: face.axes,
       previewUrl: face.previewUrl,
       previewFileUrl: face.previewFileUrl,
+      previewFallbackUrl: face.previewFallbackUrl,
       cached: false,
       active: false,
       familyId: makeFamilyId(provider, face.family),

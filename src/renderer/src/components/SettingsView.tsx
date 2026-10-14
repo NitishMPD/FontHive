@@ -1,5 +1,6 @@
 import { useApp } from '../store'
 import Icon from './Icon'
+import AppUpdates from './AppUpdates'
 
 export default function SettingsView(): React.JSX.Element {
   const settings = useApp((s) => s.settings)
@@ -13,7 +14,9 @@ export default function SettingsView(): React.JSX.Element {
   return (
     <div className="panel">
       <h2>Settings</h2>
-      <p className="sub">Preview defaults, storage locations and library statistics.</p>
+      <p className="sub">App updates, preview defaults, storage locations and library statistics.</p>
+
+      <AppUpdates />
 
       <div className="card">
         <div className="card-head">

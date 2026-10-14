@@ -4,6 +4,7 @@ import path from 'node:path'
 import type {
   AppSettings,
   Collection,
+  FontPair,
   FontRecord,
   ProviderId,
   WatchedFolder
@@ -43,16 +44,19 @@ export interface PersistedState {
   schemaVersion: number
   fonts: FontRecord[]
   collections: Collection[]
+  pairs: FontPair[]
   folders: WatchedFolder[]
   settings: AppSettings
   providerMeta: Partial<Record<ProviderId, { lastRefresh?: number }>>
 }
 
 /**
- * v2: category classification switched to PANOSE. Local files are re-indexed
- * from disk; remote catalogue records keep their provider-supplied category.
+ * v2: category classification switched to PANOSE.
+ * v3: local faces gained measured x-height/cap-height metrics for font pairing.
+ * v4: corrected the OS/2 metric field names fontkit actually exposes.
+ * Local files are re-indexed from disk; remote catalogue records are kept.
  */
-const SCHEMA_VERSION = 2
+const SCHEMA_VERSION = 4
 
 export function defaultSettings(): AppSettings {
   return {
@@ -74,10 +78,17 @@ export class Store {
   private state: PersistedState
   private timer: NodeJS.Timeout | null = null
   private writing: Promise<void> = Promise.resolve()
+  /** True when a schema bump dropped local faces that now need re-indexing. */
+  private readonly staleLocalFaces: boolean
 
-  private constructor(file: string, state: PersistedState) {
+  private constructor(file: string, state: PersistedState, staleLocalFaces: boolean) {
     this.file = file
     this.state = state
+    this.staleLocalFaces = staleLocalFaces
+  }
+
+  get needsLocalRescan(): boolean {
+    return this.staleLocalFaces
   }
 
   static async open(): Promise<Store> {
@@ -88,6 +99,7 @@ export class Store {
     // A schema bump invalidates derived fields. Local faces are cheap to
     // re-index from disk, so drop only those and let the next scan restore them.
     const stale = (loaded.schemaVersion ?? 0) !== SCHEMA_VERSION
+    const droppedLocal = stale && (loaded.fonts ?? []).some((f) => f.provider === 'local')
     const fonts = stale
       ? (loaded.fonts ?? []).filter((font) => font.provider !== 'local')
       : (loaded.fonts ?? [])
@@ -96,6 +108,7 @@ export class Store {
       schemaVersion: SCHEMA_VERSION,
       fonts,
       collections: loaded.collections ?? [],
+      pairs: loaded.pairs ?? [],
       folders: loaded.folders ?? [],
       settings: { ...defaults, ...(loaded.settings ?? {}) },
       providerMeta: loaded.providerMeta ?? {}
@@ -103,7 +116,7 @@ export class Store {
     // Paths can move between versions/platforms; keep cache dirs anchored to this install.
     state.settings.cacheDir = defaults.cacheDir
     state.settings.fontStoreDir = defaults.fontStoreDir
-    return new Store(file, state)
+    return new Store(file, state, droppedLocal)
   }
 
   get fonts(): FontRecord[] {
@@ -112,6 +125,10 @@ export class Store {
 
   get collections(): Collection[] {
     return this.state.collections
+  }
+
+  get pairs(): FontPair[] {
+    return this.state.pairs
   }
 
   get folders(): WatchedFolder[] {
@@ -133,6 +150,11 @@ export class Store {
 
   setCollections(collections: Collection[]): void {
     this.state.collections = collections
+    this.schedule()
+  }
+
+  setPairs(pairs: FontPair[]): void {
+    this.state.pairs = pairs
     this.schedule()
   }
 

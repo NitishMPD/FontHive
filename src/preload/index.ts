@@ -1,8 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AppSettings,
+  AppUpdateState,
   Collection,
   FontManagerApi,
+  FontPair,
   FontRecord,
   Progress,
   ProviderId,
@@ -30,6 +32,8 @@ const api: FontManagerApi = {
 
   saveCollection: (collection: Collection) => ipcRenderer.invoke('save-collection', collection),
   deleteCollection: (id: string) => ipcRenderer.invoke('delete-collection', id),
+  savePair: (pair: FontPair) => ipcRenderer.invoke('save-pair', pair),
+  deletePair: (id: string) => ipcRenderer.invoke('delete-pair', id),
   updateFont: (id: string, patch: UpdateFontPatch) => ipcRenderer.invoke('update-font', id, patch),
   updateMany: (ids: string[], patch: UpdateFontPatch) => ipcRenderer.invoke('update-many', ids, patch),
 
@@ -44,6 +48,11 @@ const api: FontManagerApi = {
     ipcRenderer.invoke('set-title-bar-theme', color, symbolColor),
   revealFont: (id: string) => ipcRenderer.invoke('reveal-font', id),
   uninstallFontFile: (id: string) => ipcRenderer.invoke('uninstall-font-file', id),
+
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  onAppUpdate: (cb: (state: AppUpdateState) => void) => subscribe('app-update', cb),
 
   onProgress: (cb: (progress: Progress) => void) => subscribe('progress', cb),
   onLibraryChanged: (cb: (fonts: FontRecord[]) => void) => subscribe('library-changed', cb)

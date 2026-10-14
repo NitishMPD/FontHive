@@ -12,6 +12,8 @@ export interface Filters {
   onlyFavorites: boolean
   sort: SortKey
   collectionId: string | null
+  /** Collapse the same face offered by several catalogue sources into one card. */
+  groupDuplicates: boolean
 }
 
 export const emptyFilters: Filters = {
@@ -23,7 +25,8 @@ export const emptyFilters: Filters = {
   variableOnly: false,
   onlyFavorites: false,
   sort: 'name',
-  collectionId: null
+  collectionId: null,
+  groupDuplicates: true
 }
 
 function matchCondition(font: FontRecord, condition: SmartCondition): boolean {
@@ -207,6 +210,26 @@ export function applyFilters(
   return result
 }
 
+const PROVIDER_RANK: Record<string, number> = { local: 4, google: 3, fontsource: 2, bunny: 1 }
+
+/**
+ * The same face is often listed by several providers — 86% of this library's
+ * faces are. Keep the most useful copy of each so browsing shows fonts rather
+ * than sources. Records are untouched, so a source filter still lists exactly
+ * what that source offers.
+ */
+export function dedupeFaces(fonts: FontRecord[]): FontRecord[] {
+  const score = (f: FontRecord): number =>
+    (f.active ? 100 : 0) + (f.favorite ? 60 : 0) + (f.filePath ? 50 : 0) + (PROVIDER_RANK[f.provider] ?? 0)
+  const best = new Map<string, FontRecord>()
+  for (const font of fonts) {
+    const key = `${font.family.trim().toLowerCase()}|${font.weight}|${font.style}`
+    const current = best.get(key)
+    if (!current || score(font) > score(current)) best.set(key, font)
+  }
+  return [...best.values()]
+}
+
 function computeFilters(
   fonts: FontRecord[],
   filters: Filters,
@@ -229,7 +252,8 @@ function computeFilters(
     return true
   }
 
-  const candidates = pool.filter(passesFacets)
+  const filtered = pool.filter(passesFacets)
+  const candidates = filters.groupDuplicates ? dedupeFaces(filtered) : filtered
 
   const byName = (a: FontRecord, b: FontRecord): number =>
     a.family.localeCompare(b.family) || a.weight - b.weight

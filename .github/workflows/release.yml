@@ -1,0 +1,53 @@
+name: Windows release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.5.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Set automatic release version
+        run: node tools/release-version.cjs
+      - run: pnpm typecheck
+      - run: pnpm check:fuzzy
+      - run: pnpm check:updates
+      - name: Build Windows installer
+        run: pnpm dist:win
+      - name: Create GitHub release with notes and installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tag = "v$version"
+          $installers = @(Get-ChildItem -LiteralPath dist -Filter '*-Setup.exe')
+          if ($installers.Count -ne 1) { throw 'Expected exactly one Windows installer' }
+          $metadata = Join-Path $PWD 'dist/latest.yml'
+          $blockmap = "$($installers[0].FullName).blockmap"
+          if (!(Test-Path -LiteralPath $metadata) -or !(Test-Path -LiteralPath $blockmap)) { throw 'Missing auto-update metadata' }
+          gh release create $tag $installers[0].FullName $metadata $blockmap --target "$env:GITHUB_SHA" --draft --generate-notes --title "Font Hive $tag"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create release draft' }
+          gh release edit $tag --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish release' }

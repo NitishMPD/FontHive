@@ -26,6 +26,18 @@ export interface VariationAxis {
   max: number
 }
 
+/**
+ * Measured vertical proportions, normalised to the em square. Only available
+ * once a face has been parsed from a real file, so catalogue-only entries leave
+ * this undefined — pairing falls back to category and weight when it is absent.
+ */
+export interface FontMetrics {
+  /** x-height as a fraction of the em square, e.g. 0.52. */
+  xHeight?: number
+  /** cap-height as a fraction of the em square, e.g. 0.72. */
+  capHeight?: number
+}
+
 /** One selectable font face in the library. */
 export interface FontRecord {
   /** Stable identity: `<provider>:<postScriptName|hash>`. */
@@ -51,6 +63,11 @@ export interface FontRecord {
   previewUrl?: string
   /** Direct woff2 preview used when the provider has no CSS endpoint. */
   previewFileUrl?: string
+  /**
+   * Tried after `previewFileUrl`. Lets a provider prefer a variable file (so the
+   * axis controls do something) while keeping a static instance as a safety net.
+   */
+  previewFallbackUrl?: string
 
   /** Downloaded into the local cache. */
   cached: boolean
@@ -62,6 +79,8 @@ export interface FontRecord {
   license?: string
   designer?: string
   copyright?: string
+  /** Present only for faces parsed from a file. */
+  metrics?: FontMetrics
 
   collections: string[]
   tags: string[]
@@ -121,6 +140,18 @@ export interface WatchedFolder {
   lastScan?: number
 }
 
+/** A saved heading + body combination. */
+export interface FontPair {
+  id: string
+  name: string
+  /** Face used for headings and display text. */
+  headingId: string
+  /** Face used for body copy. */
+  bodyId: string
+  note?: string
+  createdAt: number
+}
+
 export interface ProviderInfo {
   id: ProviderId
   name: string
@@ -166,13 +197,24 @@ export interface AppSettings {
   fontStoreDir: string
 }
 
+export interface AppUpdateState {
+  revision: number
+  status: 'unsupported' | 'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'error'
+  currentVersion: string
+  availableVersion: string | null
+  percent: number | null
+  error: string | null
+}
+
 export interface Bootstrap {
   fonts: FontRecord[]
   collections: Collection[]
+  pairs: FontPair[]
   folders: WatchedFolder[]
   providers: ProviderInfo[]
   settings: AppSettings
   platform: string
+  appUpdate: AppUpdateState
 }
 
 export interface UpdateFontPatch {
@@ -197,6 +239,8 @@ export interface FontManagerApi {
 
   saveCollection(collection: Collection): Promise<Collection[]>
   deleteCollection(id: string): Promise<Collection[]>
+  savePair(pair: FontPair): Promise<FontPair[]>
+  deletePair(id: string): Promise<FontPair[]>
   updateFont(id: string, patch: UpdateFontPatch): Promise<FontRecord>
   updateMany(ids: string[], patch: UpdateFontPatch): Promise<FontRecord[]>
 
@@ -209,6 +253,11 @@ export interface FontManagerApi {
   revealFont(id: string): Promise<void>
   setTitleBarTheme(color: string, symbolColor: string): Promise<void>
   uninstallFontFile(id: string): Promise<FontRecord>
+
+  checkForUpdates(): Promise<void>
+  downloadUpdate(): Promise<void>
+  installUpdate(): Promise<void>
+  onAppUpdate(cb: (state: AppUpdateState) => void): () => void
 
   onProgress(cb: (progress: Progress) => void): () => void
   onLibraryChanged(cb: (fonts: FontRecord[]) => void): () => void

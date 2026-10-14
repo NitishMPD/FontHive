@@ -7,12 +7,46 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "dist:win": "pnpm build && electron-builder --win --x64 --publish never",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "check:providers": "esbuild tools/provider-check.ts --bundle --platform=node --format=cjs --target=node20 --outfile=tools/provider-check.built.cjs --external:fontkit --external:koffi --log-level=error && node tools/provider-check.built.cjs",
-    "check:fuzzy": "esbuild tools/fuzzy-check.ts --bundle --platform=node --format=cjs --target=node20 --outfile=tools/fuzzy-check.built.cjs --log-level=error && node tools/fuzzy-check.built.cjs"
+    "check:fuzzy": "esbuild tools/fuzzy-check.ts --bundle --platform=node --format=cjs --target=node20 --outfile=tools/fuzzy-check.built.cjs --log-level=error && node tools/fuzzy-check.built.cjs",
+    "check:updates": "node tools/release-version.cjs --check && esbuild tools/update-check.ts --bundle --platform=node --format=cjs --target=node20 --outfile=tools/update-check.built.cjs --log-level=error && node tools/update-check.built.cjs"
+  },
+  "build": {
+    "appId": "com.nitishmpd.fonthive",
+    "productName": "Font Hive",
+    "publish": {
+      "provider": "github",
+      "owner": "NitishMPD",
+      "repo": "FontHive",
+      "releaseType": "release"
+    },
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "resources/icon.png"
+    ],
+    "asarUnpack": [
+      "node_modules/koffi/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "resources/icon.ico",
+      "artifactName": "Font-Hive-${version}-${arch}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
+    }
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "fontkit": "^2.0.4",
     "koffi": "^2.9.0"
   },
@@ -23,6 +57,7 @@
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.3.1",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^2.3.0",
     "esbuild": "^0.25.0",
     "react": "^19.0.0",

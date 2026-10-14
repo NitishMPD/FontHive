@@ -21,6 +21,8 @@ export interface CatalogFace {
   previewUrl?: string
   /** Direct woff2 used when a CSS URL is not appropriate. */
   previewFileUrl?: string
+  /** Tried after `previewFileUrl`; keeps a static instance as a safety net. */
+  previewFallbackUrl?: string
   version?: string
   license?: string
   designer?: string

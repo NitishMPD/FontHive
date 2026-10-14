@@ -9,6 +9,7 @@ import {
 
 const API_URL = 'https://api.fontsource.org/v1/fonts'
 const CDN = 'https://cdn.jsdelivr.net/fontsource/fonts'
+const VARIABLE_CDN = 'https://cdn.jsdelivr.net/npm/@fontsource-variable'
 
 interface FontsourceFont {
   id: string
@@ -35,6 +36,15 @@ export function fontsourceUrl(
   ext: 'ttf' | 'woff2'
 ): string {
   return `${CDN}/${id}@latest/${subset}-${weight}-${style}.${ext}`
+}
+
+/**
+ * Variable faces live in a separate npm scope and are named by the axes they
+ * carry. The static per-weight files ignore `font-variation-settings`, so only
+ * this one makes the axis controls do anything.
+ */
+export function fontsourceVariableUrl(id: string, subset: string, style: FontStyle): string {
+  return `${VARIABLE_CDN}/${id}@latest/files/${id}-${subset}-wght-${style}.woff2`
 }
 
 export const fontsourceProvider: Provider = {
@@ -70,12 +80,27 @@ export const fontsourceProvider: Provider = {
             postScriptName: `${entry.family.replace(/\s+/g, '')}-${weight}${isItalic ? 'italic' : ''}`,
             weight,
             style: isItalic ? 'italic' : 'normal',
-            // Variable packages expose their full axis on the wght variable file.
+            // Range taken from the package's real weights rather than assumed.
             axes: entry.variable
-              ? [{ tag: 'wght', name: 'Weight', min: 100, default: 400, max: 900 }]
+              ? [
+                  {
+                    tag: 'wght',
+                    name: 'Weight',
+                    min: Math.min(...weights),
+                    default: Math.min(Math.max(400, Math.min(...weights)), Math.max(...weights)),
+                    max: Math.max(...weights)
+                  }
+                ]
               : [],
             category,
-            previewFileUrl: fontsourceUrl(entry.id, subset, weight, isItalic ? 'italic' : 'normal', 'woff2'),
+            previewFileUrl: entry.variable
+              ? fontsourceVariableUrl(entry.id, subset, isItalic ? 'italic' : 'normal')
+              : fontsourceUrl(entry.id, subset, weight, isItalic ? 'italic' : 'normal', 'woff2'),
+            // Static instance as a safety net: if the variable file is missing the
+            // browser falls through to this instead of showing nothing.
+            previewFallbackUrl: entry.variable
+              ? fontsourceUrl(entry.id, subset, weight, isItalic ? 'italic' : 'normal', 'woff2')
+              : undefined,
             version: entry.type,
             license: entry.license,
             designer: entry.type ? `Source: ${entry.type}` : undefined
@@ -87,10 +112,11 @@ export const fontsourceProvider: Provider = {
   },
 
   async resolveDownload(font: FontRecord): Promise<DownloadTarget> {
-    // The catalogue stores the exact woff2 path, so mirror it to .ttf.
-    const woff2 = font.previewUrl || font.previewFileUrl || ''
-    const ttf = woff2.replace(/\.woff2$/, '.ttf')
-    if (ttf && ttf !== woff2) return { url: ttf, format: 'ttf' }
+    // Downloads must be a static instance, so mirror the static woff2 path — not
+    // the variable one — into .ttf.
+    const staticWoff2 = font.previewFallbackUrl || font.previewUrl || font.previewFileUrl || ''
+    const ttf = staticWoff2.replace(/\.woff2$/, '.ttf')
+    if (ttf && ttf !== staticWoff2) return { url: ttf, format: 'ttf' }
 
     const familySlug = font.family.toLowerCase().replace(/[^a-z0-9]+/g, '-')
     return {

@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import type {
   AppSettings,
+  AppUpdateState,
   Collection,
+  FontPair,
   FontRecord,
   Progress,
   ProviderId,
@@ -15,6 +17,7 @@ import { defaultAxisValues } from './lib/fontface'
 export type View =
   | { kind: 'library' }
   | { kind: 'collection'; id: string }
+  | { kind: 'pairs' }
   | { kind: 'providers' }
   | { kind: 'folders' }
   | { kind: 'settings' }
@@ -30,10 +33,12 @@ interface AppState {
   ready: boolean
   fonts: FontRecord[]
   collections: Collection[]
+  pairs: FontPair[]
   folders: WatchedFolder[]
   providers: ProviderInfo[]
   settings: AppSettings
   platform: string
+  appUpdate: AppUpdateState | null
 
   filters: Filters
   view: View
@@ -43,7 +48,9 @@ interface AppState {
   toasts: Toast[]
   axisValues: Record<string, Record<string, number>>
   selection: string[]
+  sidebarCollapsed: boolean
 
+  toggleSidebar: () => void
   init: () => Promise<void>
   setFilters: (patch: Partial<Filters>) => void
   setView: (view: View) => void
@@ -64,6 +71,8 @@ interface AppState {
 
   saveCollection: (collection: Collection) => Promise<void>
   deleteCollection: (id: string) => Promise<void>
+  savePair: (pair: FontPair) => Promise<void>
+  deletePair: (id: string) => Promise<void>
   updateFont: (id: string, patch: UpdateFontPatch) => Promise<void>
   updateMany: (ids: string[], patch: UpdateFontPatch) => Promise<void>
 
@@ -77,6 +86,8 @@ interface AppState {
 }
 
 let toastSeq = 0
+
+export const toastDuration = (tone: Toast['tone']): number => (tone === 'error' ? 7000 : 4000)
 
 /**
  * Provider counts are derived from the library rather than trusted from the
@@ -94,6 +105,7 @@ export const useApp = create<AppState>((set, get) => ({
   ready: false,
   fonts: [],
   collections: [],
+  pairs: [],
   folders: [],
   providers: [],
   settings: {
@@ -105,6 +117,7 @@ export const useApp = create<AppState>((set, get) => ({
     fontStoreDir: ''
   },
   platform: 'win32',
+  appUpdate: null,
 
   filters: { ...emptyFilters },
   view: { kind: 'library' },
@@ -114,6 +127,13 @@ export const useApp = create<AppState>((set, get) => ({
   toasts: [],
   axisValues: {},
   selection: [],
+  sidebarCollapsed: localStorage.getItem('sidebarCollapsed') === '1',
+
+  toggleSidebar: () => {
+    const next = !get().sidebarCollapsed
+    localStorage.setItem('sidebarCollapsed', next ? '1' : '0')
+    set({ sidebarCollapsed: next })
+  },
 
   async init() {
     const boot = await window.api.bootstrap()
@@ -121,10 +141,14 @@ export const useApp = create<AppState>((set, get) => ({
       ready: true,
       fonts: boot.fonts,
       collections: boot.collections,
+      pairs: boot.pairs,
       folders: boot.folders,
       providers: withCounts(boot.providers, boot.fonts),
       settings: boot.settings,
-      platform: boot.platform
+      platform: boot.platform,
+      appUpdate: (get().appUpdate?.revision ?? -1) > boot.appUpdate.revision
+        ? get().appUpdate
+        : boot.appUpdate
     })
 
     window.api.onProgress((progress) => set({ progress }))
@@ -249,6 +273,17 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
 
+  async savePair(pair) {
+    const pairs = await window.api.savePair(pair)
+    set({ pairs })
+    get().toast(`Saved “${pair.name}”`, 'success')
+  },
+
+  async deletePair(id) {
+    const pairs = await window.api.deletePair(id)
+    set({ pairs })
+  },
+
   async updateFont(id, patch) {
     const font = await window.api.updateFont(id, patch)
     set({ fonts: get().fonts.map((f) => (f.id === id ? font : f)) })
@@ -283,7 +318,7 @@ export const useApp = create<AppState>((set, get) => ({
   toast(text, tone = 'info') {
     const id = ++toastSeq
     set({ toasts: [...get().toasts, { id, text, tone }] })
-    setTimeout(() => get().dismissToast(id), tone === 'error' ? 7000 : 4000)
+    setTimeout(() => get().dismissToast(id), toastDuration(tone))
   },
 
   dismissToast(id) {

@@ -50,11 +50,17 @@ export function ensureFontLoaded(font: FontRecord): string {
     return `'${font.family}'`
   }
 
-  // 3. A direct remote woff2 (Fontsource).
+  // 3. A direct remote woff2 (Fontsource). A provider may prefer a variable file
+  //    and keep a static instance behind it; the browser walks the src list in
+  //    order, so a missing variable file silently degrades instead of failing.
   if (font.previewFileUrl) {
     const family = localFamilyName(font)
+    const sources = [`url('${font.previewFileUrl}') format('woff2')`]
+    if (font.previewFallbackUrl) {
+      sources.push(`url('${font.previewFallbackUrl}') format('woff2')`)
+    }
     injectFace(
-      `@font-face{font-family:'${family}';src:url('${font.previewFileUrl}') format('woff2');font-weight:${font.weight};font-style:${font.style};font-display:swap;}`,
+      `@font-face{font-family:'${family}';src:${sources.join(',')};font-weight:${font.weight};font-style:${font.style};font-display:swap;}`,
       family
     )
     return family
@@ -64,15 +70,22 @@ export function ensureFontLoaded(font: FontRecord): string {
   return "'Inter', 'Segoe UI', system-ui, sans-serif"
 }
 
-/** Build a `font-variation-settings` string from axis overrides. */
+/**
+ * Build a `font-variation-settings` string from axis overrides.
+ *
+ * `font-variation-settings` wins over `font-weight`, so an un-overridden axis
+ * must still resolve to the face's own values — otherwise every weight of a
+ * variable family would render at the axis default.
+ */
 export function variationSettings(
   font: FontRecord,
   values: Record<string, number>
 ): string | undefined {
   if (!font.axes?.length) return undefined
+  const defaults = defaultAxisValues(font)
   const parts: string[] = []
   for (const axis of font.axes) {
-    const value = values[axis.tag] ?? axis.default
+    const value = values[axis.tag] ?? defaults[axis.tag]
     parts.push(`"${axis.tag}" ${value}`)
   }
   return parts.length ? parts.join(', ') : undefined
@@ -80,6 +93,11 @@ export function variationSettings(
 
 export function defaultAxisValues(font: FontRecord): Record<string, number> {
   const out: Record<string, number> = {}
-  for (const axis of font.axes ?? []) out[axis.tag] = axis.default
+  for (const axis of font.axes ?? []) {
+    // Start the weight axis at the face's own weight, so opening "Inter 300"
+    // does not present a slider already reading 400.
+    out[axis.tag] =
+      axis.tag === 'wght' ? Math.min(Math.max(font.weight, axis.min), axis.max) : axis.default
+  }
   return out
 }

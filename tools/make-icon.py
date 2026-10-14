@@ -3,7 +3,7 @@ import os
 from PIL import Image, ImageDraw
 
 S = 2048
-BG, FG = (15, 15, 16, 255), (234, 223, 200, 255)
+BG, FG = (10, 10, 10, 255), (245, 245, 245, 255)
 
 img = Image.new('RGBA', (S, S), (0, 0, 0, 0))
 d = ImageDraw.Draw(img)

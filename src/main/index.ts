@@ -1,11 +1,13 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { BrowserWindow, app, ipcMain, protocol, shell } from 'electron'
+import { NsisUpdater } from 'electron-updater'
 import type {
   ActivationResult,
   AppSettings,
   Bootstrap,
   Collection,
+  FontPair,
   FontRecord,
   Progress,
   ProviderId,
@@ -20,6 +22,7 @@ import { makeFamilyId, makeId, scanFolder, systemFontDirs } from './fonts/scanne
 import { Store } from './store'
 import { catalogToRecords, isRemoteProvider, providerNames, remoteProviders } from './providers'
 import { FONT_UA } from './providers/types'
+import { createUpdateController } from './updates'
 
 const MIME: Record<string, string> = {
   ttf: 'font/ttf',
@@ -39,6 +42,31 @@ protocol.registerSchemesAsPrivileged([
 let win: BrowserWindow | null = null
 let store: Store
 let activator: Activator
+let updates: ReturnType<typeof createUpdateController>
+let activeOperations = 0
+
+async function trackOperation<T>(action: () => T | Promise<T>): Promise<T> {
+  activeOperations++
+  try {
+    return await action()
+  } finally {
+    activeOperations--
+  }
+}
+
+function requireMainWindow(event: Electron.IpcMainInvokeEvent): void {
+  if (event.sender !== win?.webContents || event.senderFrame !== event.sender.mainFrame) {
+    throw new Error('Only the main app window can perform this action')
+  }
+}
+
+function handle(channel: string, listener: Parameters<typeof ipcMain.handle>[1]): void {
+  ipcMain.handle(channel, (event, ...args) => {
+    requireMainWindow(event)
+    if (updates.getState().status === 'installing') throw new Error('The app is restarting to install an update')
+    return trackOperation(() => listener(event, ...args))
+  })
+}
 
 const providerStatus: Record<ProviderId, ProviderInfo['status']> = {
   google: 'idle',
@@ -353,26 +381,28 @@ async function setActivation(ids: string[], active: boolean): Promise<Activation
 /* ------------------------------------------------------------------ */
 
 function registerIpc(): void {
-  ipcMain.handle('bootstrap', async (): Promise<Bootstrap> => {
+  handle('bootstrap', async (): Promise<Bootstrap> => {
     reconcileActive()
     return {
       fonts: store.fonts,
       collections: store.collections,
+      pairs: store.pairs,
       folders: store.folders,
       providers: providerInfos(),
       settings: store.settings,
-      platform: process.platform
+      platform: process.platform,
+      appUpdate: updates.getState()
     }
   })
 
-  ipcMain.handle('rescan', () => scanLocal())
-  ipcMain.handle('refresh-provider', (_e, id: ProviderId) => refreshProvider(id))
-  ipcMain.handle('download-font', (_e, id: string) => downloadFont(id))
-  ipcMain.handle('download-many', (_e, ids: string[]) => downloadMany(ids))
-  ipcMain.handle('activate', (_e, ids: string[]) => setActivation(ids, true))
-  ipcMain.handle('deactivate', (_e, ids: string[]) => setActivation(ids, false))
+  handle('rescan', () => scanLocal())
+  handle('refresh-provider', (_e, id: ProviderId) => refreshProvider(id))
+  handle('download-font', (_e, id: string) => downloadFont(id))
+  handle('download-many', (_e, ids: string[]) => downloadMany(ids))
+  handle('activate', (_e, ids: string[]) => setActivation(ids, true))
+  handle('deactivate', (_e, ids: string[]) => setActivation(ids, false))
 
-  ipcMain.handle('save-collection', (_e, collection: Collection) => {
+  handle('save-collection', (_e, collection: Collection) => {
     const list = [...store.collections]
     const index = list.findIndex((c) => c.id === collection.id)
     if (index >= 0) list[index] = collection
@@ -381,13 +411,33 @@ function registerIpc(): void {
     return list
   })
 
-  ipcMain.handle('delete-collection', (_e, id: string) => {
+  handle('delete-collection', (_e, id: string) => {
     const list = store.collections.filter((c) => c.id !== id)
     store.setCollections(list)
     return list
   })
 
-  ipcMain.handle('update-font', (_e, id: string, patch: UpdateFontPatch) => {
+  handle('save-pair', (_e, pair: FontPair) => {
+    // Saving the same heading+body again updates the existing entry instead of
+    // filling the list with duplicates.
+    const list = [...store.pairs]
+    const index = list.findIndex(
+      (p) =>
+        p.id === pair.id || (p.headingId === pair.headingId && p.bodyId === pair.bodyId)
+    )
+    if (index >= 0) list[index] = { ...list[index], ...pair, id: list[index].id }
+    else list.push(pair)
+    store.setPairs(list)
+    return list
+  })
+
+  handle('delete-pair', (_e, id: string) => {
+    const list = store.pairs.filter((p) => p.id !== id)
+    store.setPairs(list)
+    return list
+  })
+
+  handle('update-font', (_e, id: string, patch: UpdateFontPatch) => {
     const font = store.fonts.find((f) => f.id === id)
     if (!font) throw new Error('Font not found')
     Object.assign(font, patch)
@@ -395,7 +445,7 @@ function registerIpc(): void {
     return font
   })
 
-  ipcMain.handle('update-many', (_e, ids: string[], patch: UpdateFontPatch) => {
+  handle('update-many', (_e, ids: string[], patch: UpdateFontPatch) => {
     const touched: FontRecord[] = []
     for (const id of ids) {
       const font = store.fonts.find((f) => f.id === id)
@@ -407,7 +457,7 @@ function registerIpc(): void {
     return touched
   })
 
-  ipcMain.handle('add-folder', async () => {
+  handle('add-folder', async () => {
     const result = await dialogShowOpenDialog()
     if (result) {
       const exists = store.folders.some((f) => path.normalize(f.path) === path.normalize(result))
@@ -420,7 +470,7 @@ function registerIpc(): void {
     return store.folders
   })
 
-  ipcMain.handle('remove-folder', (_e, target: string) => {
+  handle('remove-folder', (_e, target: string) => {
     const normalized = path.normalize(target).toLowerCase()
     store.setFolders(store.folders.filter((f) => path.normalize(f.path) !== path.normalize(target)))
 
@@ -442,7 +492,7 @@ function registerIpc(): void {
     return store.folders
   })
 
-  ipcMain.handle('toggle-folder', (_e, target: string, enabled: boolean) => {
+  handle('toggle-folder', (_e, target: string, enabled: boolean) => {
     store.setFolders(
       store.folders.map((f) =>
         path.normalize(f.path) === path.normalize(target) ? { ...f, enabled } : f
@@ -451,19 +501,19 @@ function registerIpc(): void {
     return store.folders
   })
 
-  ipcMain.handle('save-settings', (_e, patch: Partial<AppSettings>) => store.setSettings(patch))
-  ipcMain.handle('open-external', (_e, url: string) => shell.openExternal(url))
+  handle('save-settings', (_e, patch: Partial<AppSettings>) => store.setSettings(patch))
+  handle('open-external', (_e, url: string) => shell.openExternal(url))
 
-  ipcMain.handle('set-title-bar-theme', (_e, color: string, symbolColor: string) => {
+  handle('set-title-bar-theme', (_e, color: string, symbolColor: string) => {
     win?.setTitleBarOverlay({ color, symbolColor, height: TITLE_BAR_HEIGHT })
   })
 
-  ipcMain.handle('reveal-font', (_e, id: string) => {
+  handle('reveal-font', (_e, id: string) => {
     const font = store.fonts.find((f) => f.id === id)
     if (font?.filePath) shell.showItemInFolder(font.filePath)
   })
 
-  ipcMain.handle('uninstall-font-file', async (_e, id: string) => {
+  handle('uninstall-font-file', async (_e, id: string) => {
     const font = store.fonts.find((f) => f.id === id)
     if (!font) throw new Error('Font not found')
     if (font.active) await activator.deactivate(font)
@@ -506,12 +556,12 @@ function createWindow(): void {
     minWidth: 1040,
     minHeight: 680,
     show: false,
-    backgroundColor: '#0b0b0c',
+    backgroundColor: '#0a0a0a',
     title: 'Font Hive',
     icon: path.join(app.getAppPath(), 'resources/icon.png'),
     // Custom title bar: the renderer draws the drag area, Windows draws the caption buttons.
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#101011', symbolColor: '#a8a296', height: TITLE_BAR_HEIGHT },
+    titleBarOverlay: { color: '#111111', symbolColor: '#a3a3a3', height: TITLE_BAR_HEIGHT },
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -541,10 +591,43 @@ function createWindow(): void {
 /* Boot                                                                */
 /* ------------------------------------------------------------------ */
 
+app.setPath('userData', path.join(app.getPath('appData'), 'font-hive'))
+const hasInstanceLock = app.requestSingleInstanceLock()
+if (!hasInstanceLock) app.quit()
+app.on('second-instance', () => {
+  if (win?.isMinimized()) win.restore()
+  win?.show()
+  win?.focus()
+})
+
 app.whenReady().then(async () => {
+  if (!hasInstanceLock) return
   store = await Store.open()
   activator = await Activator.open()
   reconcileActive()
+
+  updates = createUpdateController(
+    app.getVersion(),
+    app.isPackaged && process.platform === 'win32' && process.arch === 'x64'
+      ? new NsisUpdater({ provider: 'github', owner: 'NitishMPD', repo: 'FontHive' })
+      : undefined,
+    async () => {
+      if (activeOperations > 0) throw new Error('Wait for library operations to finish, then try restarting again.')
+      await store.flush()
+    },
+    (state) => win?.webContents.send('app-update', state)
+  )
+
+  for (const [channel, action] of [
+    ['check-for-updates', () => updates.check()],
+    ['download-update', () => updates.download()],
+    ['install-update', () => updates.install()]
+  ] as const) {
+    ipcMain.handle(channel, (event) => {
+      requireMainWindow(event)
+      return action()
+    })
+  }
 
   protocol.handle('hive-font', async (request) => {
     try {
@@ -568,14 +651,24 @@ app.whenReady().then(async () => {
   registerIpc()
   createWindow()
 
-  // First run: index the system fonts so the library is never empty. Afterwards,
-  // keep watched folders in sync in the background without paying for a full
-  // system rescan on every launch.
-  if (store.fonts.length === 0) {
-    void scanLocal()
+  // First run: index the system fonts so the library is never empty. A schema
+  // bump also drops local faces while catalogue records survive, so that case
+  // needs a full re-index too. Otherwise keep watched folders in sync without
+  // paying for a full system rescan on every launch.
+  if (store.fonts.length === 0 || store.needsLocalRescan) {
+    void trackOperation(() => scanLocal()).catch(console.error)
   } else if (store.folders.some((f) => f.enabled)) {
-    void scanLocal({ includeSystem: false })
+    void trackOperation(() => scanLocal({ includeSystem: false })).catch(console.error)
   }
+
+  const firstCheck = setTimeout(() => void updates.check(), 10_000)
+  const periodicCheck = setInterval(() => void updates.check(), 6 * 60 * 60 * 1000)
+  firstCheck.unref()
+  periodicCheck.unref()
+  app.once('before-quit', () => {
+    clearTimeout(firstCheck)
+    clearInterval(periodicCheck)
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

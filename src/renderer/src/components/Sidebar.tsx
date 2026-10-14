@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useApp } from '../store'
+import { dedupeFaces } from '../lib/filter'
 import Icon from './Icon'
 import type { ProviderId } from '@shared/types'
 
@@ -9,6 +10,7 @@ export default function Sidebar(): React.JSX.Element {
   const fonts = useApp((s) => s.fonts)
   const providers = useApp((s) => s.providers)
   const collections = useApp((s) => s.collections)
+  const pairs = useApp((s) => s.pairs)
   const view = useApp((s) => s.view)
   const filters = useApp((s) => s.filters)
   const setView = useApp((s) => s.setView)
@@ -18,6 +20,12 @@ export default function Sidebar(): React.JSX.Element {
 
   const activeCount = useMemo(() => fonts.filter((f) => f.active).length, [fonts])
   const favoriteCount = useMemo(() => fonts.filter((f) => f.favorite).length, [fonts])
+  // "Browse Fonts" must equal what the grid actually shows. With grouping on,
+  // that is the de-duplicated set, not the raw record count.
+  const libraryCount = useMemo(
+    () => (filters.groupDuplicates ? dedupeFaces(fonts).length : fonts.length),
+    [fonts, filters.groupDuplicates]
+  )
   const onLibrary = view.kind === 'library'
 
   const browseLibrary = (patch: Parameters<typeof setFilters>[0]): void => {
@@ -34,7 +42,7 @@ export default function Sidebar(): React.JSX.Element {
         >
           <Icon name="library" />
           <span className="label">Browse Fonts</span>
-          <span className="count">{fonts.length.toLocaleString()}</span>
+          <span className="count">{libraryCount.toLocaleString()}</span>
         </button>
 
         <button
@@ -85,7 +93,7 @@ export default function Sidebar(): React.JSX.Element {
         </div>
 
         {collections.length === 0 && (
-          <div style={{ padding: '2px 8px', fontSize: 11.5, color: 'var(--text-faint)' }}>
+          <div className="nav-hint" style={{ padding: '2px 8px', fontSize: 11.5, color: 'var(--text-faint)' }}>
             No collections yet
           </div>
         )}
@@ -116,6 +124,14 @@ export default function Sidebar(): React.JSX.Element {
 
         <div className="nav-section">Manage</div>
         <button
+          className={`nav-item ${view.kind === 'pairs' ? 'active' : ''}`}
+          onClick={() => setView({ kind: 'pairs' })}
+        >
+          <Icon name="swap" />
+          <span className="label">Font pairs</span>
+          {pairs.length > 0 && <span className="count">{pairs.length}</span>}
+        </button>
+        <button
           className={`nav-item ${view.kind === 'folders' ? 'active' : ''}`}
           onClick={() => setView({ kind: 'folders' })}
         >
@@ -141,7 +157,7 @@ export default function Sidebar(): React.JSX.Element {
       <div className="sidebar-footer">
         <button className="btn" onClick={() => void rescan()} disabled={Boolean(busy)}>
           <Icon name="refresh" size={14} className={busy ? 'spin' : undefined} />
-          Rescan
+          <span className="label">Rescan</span>
         </button>
       </div>
     </aside>

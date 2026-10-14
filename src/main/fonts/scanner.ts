@@ -163,6 +163,7 @@ export async function scanFolder(
         license: face.license,
         designer: face.designer,
         copyright: face.copyright,
+        metrics: face.metrics,
         collections: [],
         tags: [],
         addedAt: Date.now()

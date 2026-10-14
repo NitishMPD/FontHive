@@ -89,6 +89,19 @@ export default function Toolbar(): React.JSX.Element {
               {p.label}
             </label>
           ))}
+
+          <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
+
+          {/* Kept out of PROPERTIES so it does not inflate the count badge: it is
+              a view preference that defaults to on, not a narrowing filter. */}
+          <label className="dd-item" title="Collapse the same font offered by several sources">
+            <input
+              type="checkbox"
+              checked={filters.groupDuplicates}
+              onChange={() => setFilters({ groupDuplicates: !filters.groupDuplicates })}
+            />
+            Group duplicate sources
+          </label>
         </Dropdown>
 
         <input

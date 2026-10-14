@@ -56,7 +56,6 @@ function FontCardImpl({ font, style, selected, inSelection }: Props): React.JSX.
       <div className="font-card-head">
         <div className="font-card-title">
           <span className="font-card-family">{font.family}</span>
-          <span className="font-card-designer">{font.designer ?? font.provider}</span>
         </div>
         <span className="font-card-meta">
           {font.subfamily}

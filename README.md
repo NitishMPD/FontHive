@@ -54,6 +54,8 @@ cache.
 **Controls**
 - Variable font axes driven by sliders, applied live to the preview
 - Collections, both manual and rule-based ("smart") with `all`/`any` matching
+- Font pairs: heading + body combinations ranked on role contrast, weight
+  separation and measured x-height harmony, each showing why it was suggested
 - Tags, 1–5 star ratings and free-text notes per face
 - Filters for category, provider, active state, downloaded state and variability
 
@@ -80,6 +82,7 @@ Other scripts:
 pnpm typecheck       # typecheck main/preload and renderer
 pnpm check:providers # verify provider catalogues and the native binding
 pnpm check:fuzzy     # typo-tolerant search: behaviour and performance
+pnpm check:updates   # automatic versions and in-app update lifecycle
 ```
 
 > **Running from a terminal launched by another Electron app (such as DSH):**
@@ -87,6 +90,51 @@ pnpm check:fuzzy     # typo-tolerant search: behaviour and performance
 > as plain Node and fail with `Cannot read properties of undefined (reading
 > 'registerSchemesAsPrivileged')`. Clear it first:
 > `Remove-Item Env:ELECTRON_RUN_AS_NODE`
+
+## Windows releases
+
+Every push to `main` automatically runs checks, builds a Windows x64 installer,
+and publishes a GitHub Release with generated release notes. No manual tags or
+version bumps are required:
+
+```bash
+git push origin main
+```
+
+CI derives the version from `package.json`'s base version plus the workflow run
+number: base `0.1.0` produces `0.1.1`, `0.1.2`, and so on. It only changes the
+version in CI; it does not commit back to `main`. Keep the base stable between
+releases, changing its major/minor version when you want a new release series.
+GitHub automatically creates the matching `v<version>` tag at the pushed commit.
+
+Each release includes `Font-Hive-<version>-x64-Setup.exe`, its `.blockmap`, and
+`latest.yml` for in-app updates. Assets are uploaded to a draft before the
+release is published, so installed apps only see complete releases. Generated
+notes list merged pull requests and contributors since the previous release;
+you can edit them in GitHub after publication. If a failed run leaves a draft,
+delete that draft and its tag before rerunning the same workflow run.
+
+No personal access token is needed: the workflow uses GitHub's built-in token
+with `contents: write` permission. GitHub Actions must be enabled, and repository
+or organisation policies must allow that permission.
+
+For a local installer build on Windows, run `pnpm dist:win`; output goes into
+`dist/`. Installation is per user and uninstalling preserves your library data.
+The installer is unsigned, so Windows may show a SmartScreen warning.
+
+### In-app updates
+
+The installed Windows x64 app checks the public FontHive GitHub release feed
+10 seconds after launch and every six hours. An available update appears in the
+title bar and in **Settings > App updates**, where you can view release notes,
+download with progress, and choose **Restart and install**. It saves your library
+before restarting and blocks installation while library operations are running.
+Updates never install automatically when you close the app. Failed checks or
+downloads can be retried from Settings; development mode does not fetch updates.
+
+Install the first release manually; subsequent releases can update in-app.
+Verify the full path using two consecutive published versions. Download hashes
+are checked by Electron Updater; the installer is not code-signed.
 
 ## Layout
 
@@ -133,8 +181,14 @@ with an empty library rather than failing to launch.
 
 - Activation is implemented for Windows. macOS and Linux fall back to copying
   into the user font directory; Linux additionally runs `fc-cache`.
-- Google and Bunny serve static instances per weight, so a downloaded face has
+- Google and Bunny serve static instances per weight, so a *downloaded* face has
   no variable axes even when the catalogue entry advertises them. Local variable
   fonts keep full axis control.
+- Google, Bunny and Fontsource carry largely the same library — 25,065 records
+  cover about 2,400 families, and 86% of faces are offered by more than one
+  provider. The grid collapses identical faces to one card by default; toggle
+  **Properties → Group duplicate sources** to see every record instead. Records
+  are never deleted, so filtering by a source still lists exactly what that
+  source offers.
 - Fonts are analysed and stored locally. Catalogue requests go only to the
   provider endpoints listed above.

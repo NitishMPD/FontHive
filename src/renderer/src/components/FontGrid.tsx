@@ -51,7 +51,7 @@ export default function FontGrid(): React.JSX.Element {
   const cardWidth = usable > 0 ? Math.floor(usable / columns) : 0
 
   // Fixed chrome (head, alphabet sample, tags) plus one line of preview text.
-  const cardHeight = 212 + Math.round(settings.previewSize * 1.25)
+  const cardHeight = 192 + Math.round(settings.previewSize * 1.25)
   const rowHeight = cardHeight + GAP
 
   const rowCount = Math.ceil(visible.length / columns)
@@ -60,7 +60,7 @@ export default function FontGrid(): React.JSX.Element {
     count: rowCount,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowHeight,
-    overscan: 4
+    overscan: 8
   })
 
   useEffect(() => {

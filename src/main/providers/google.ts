@@ -24,9 +24,27 @@ interface GoogleFamily {
   popularity?: number
 }
 
-export function googleCssUrl(family: string, weight: number, style: FontStyle): string {
-  const axis = style === 'italic' ? `ital,wght@1,${weight}` : `wght@${weight}`
-  return `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:${axis}&display=swap`
+/**
+ * Google serves a *static instance* when a single weight is requested, but the
+ * true variable file when a range is. Only the range responds to
+ * `font-variation-settings`, so variable families must ask for one.
+ */
+export function googleCssUrl(
+  family: string,
+  weight: number,
+  style: FontStyle,
+  axes?: VariationAxis[]
+): string {
+  const wght = axes?.find((axis) => axis.tag === 'wght')
+  const italic = style === 'italic'
+  const spec = wght
+    ? italic
+      ? `ital,wght@1,${wght.min}..${wght.max}`
+      : `wght@${wght.min}..${wght.max}`
+    : italic
+      ? `ital,wght@1,${weight}`
+      : `wght@${weight}`
+  return `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:${spec}&display=swap`
 }
 
 /** Google's legacy endpoint emits TrueType URLs from the shared gstatic host. */
@@ -97,7 +115,7 @@ export const googleProvider: Provider = {
           style,
           category,
           axes,
-          previewUrl: googleCssUrl(family.family, weight, style),
+          previewUrl: googleCssUrl(family.family, weight, style, axes),
           version: family.lastModified,
           license: family.isOpenSource ? 'Open source' : undefined,
           designer: family.designers?.join(', ')

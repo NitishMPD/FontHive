@@ -5,6 +5,7 @@ import Toolbar from './components/Toolbar'
 import FontGrid from './components/FontGrid'
 import DetailPanel from './components/DetailPanel'
 import CollectionsView from './components/CollectionsView'
+import PairsView from './components/PairsView'
 import ProvidersView from './components/ProvidersView'
 import FoldersView from './components/FoldersView'
 import SettingsView from './components/SettingsView'
@@ -19,10 +20,15 @@ export default function App(): React.JSX.Element {
   const view = useApp((s) => s.view)
   const selectedId = useApp((s) => s.selectedId)
   const init = useApp((s) => s.init)
+  const collapsed = useApp((s) => s.sidebarCollapsed)
   const fonts = useApp((s) => s.fonts)
 
   useEffect(() => {
+    const unsubscribe = window.api.onAppUpdate((appUpdate) => {
+      useApp.setState((state) => (state.appUpdate?.revision ?? -1) < appUpdate.revision ? { appUpdate } : {})
+    })
     void init()
+    return unsubscribe
   }, [init])
 
   useEffect(() => {
@@ -48,7 +54,7 @@ export default function App(): React.JSX.Element {
   return (
     <div className="shell">
     <TitleBar />
-    <div className="app">
+    <div className={`app ${collapsed ? 'collapsed' : ''}`}>
       <Sidebar />
 
       <div className="main">
@@ -59,6 +65,7 @@ export default function App(): React.JSX.Element {
             <div className="view" key={view.kind === 'collection' ? `collection:${view.id}` : view.kind}>
               {showGrid && <FontGrid />}
               {view.kind === 'collection' && <CollectionsView collectionId={view.id} />}
+              {view.kind === 'pairs' && <PairsView />}
               {view.kind === 'providers' && <ProvidersView />}
               {view.kind === 'folders' && <FoldersView />}
               {view.kind === 'settings' && <SettingsView />}

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useApp } from '../store'
-import { applyFilters } from '../lib/filter'
+import { applyFilters, dedupeFaces } from '../lib/filter'
 
 export default function StatusBar(): React.JSX.Element {
   const progress = useApp((s) => s.progress)
@@ -13,6 +13,13 @@ export default function StatusBar(): React.JSX.Element {
   const { fonts: visible, fuzzy } = useMemo(
     () => applyFilters(fonts, filters, collections),
     [fonts, filters, collections]
+  )
+
+  // The reference total has to be the same population the grid draws from, or
+  // "showing N of M" would count faces the grid deliberately collapsed.
+  const total = useMemo(
+    () => (filters.groupDuplicates ? dedupeFaces(fonts).length : fonts.length),
+    [fonts, filters.groupDuplicates]
   )
 
   // The sidebar shows library totals, so the grid's own count has to be visible
@@ -53,7 +60,7 @@ export default function StatusBar(): React.JSX.Element {
       {filtering ? (
         <span>
           Showing <strong style={{ color: 'var(--text)' }}>{visible.length.toLocaleString()}</strong>{' '}
-          of {fonts.length.toLocaleString()} faces
+          of {total.toLocaleString()} fonts
           {fuzzy && (
             <>
               {' · '}
@@ -67,7 +74,15 @@ export default function StatusBar(): React.JSX.Element {
           )}
         </span>
       ) : (
-        <span>{fonts.length.toLocaleString()} faces indexed</span>
+        <span>
+          {total.toLocaleString()} fonts
+          {filters.groupDuplicates && total !== fonts.length && (
+            <span title={`${fonts.length.toLocaleString()} records across all catalogue sources`}>
+              {' '}
+              · grouped from {fonts.length.toLocaleString()}
+            </span>
+          )}
+        </span>
       )}
     </footer>
   )

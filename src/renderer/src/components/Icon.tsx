@@ -30,6 +30,10 @@ export type IconName =
   | 'filter'
   | 'sort'
   | 'power'
+  | 'sidebar'
+  | 'alert'
+  | 'info'
+  | 'swap'
 
 const PATHS: Record<IconName, string> = {
   library: 'M4 5h6v14H4zM14 5h6v14h-6z',
@@ -54,6 +58,10 @@ const PATHS: Record<IconName, string> = {
   moon: 'M21 13A9 9 0 1111 3a7 7 0 0010 10z',
   filter: 'M3 5h18l-7 8v6l-4-2v-4z',
   sort: 'M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3',
+  alert: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 8v5M12 16h.01',
+  info: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 11v5M12 8h.01',
+  sidebar: 'M4 5h16v14H4zM9 5v14',
+  swap: 'M4 9h13M14 6l3 3-3 3M20 15H7M10 12l-3 3 3 3',
   power: 'M12 3v9M6.4 6.4a8 8 0 1011.2 0',
   chevron: 'M6 9l6 6 6-6',
   external: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5'

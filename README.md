@@ -93,17 +93,18 @@ pnpm check:updates   # automatic versions and in-app update lifecycle
 
 ## Windows releases
 
-Every push to `main` automatically runs checks, builds a Windows x64 installer,
+Every push to `master` (the current default branch) or `main` automatically runs
+checks, builds a Windows x64 installer,
 and publishes a GitHub Release with generated release notes. No manual tags or
 version bumps are required:
 
 ```bash
-git push origin main
+git push origin master
 ```
 
 CI derives the version from `package.json`'s base version plus the workflow run
 number: base `0.1.0` produces `0.1.1`, `0.1.2`, and so on. It only changes the
-version in CI; it does not commit back to `main`. Keep the base stable between
+version in CI; it does not commit back to the branch. Keep the base stable between
 releases, changing its major/minor version when you want a new release series.
 GitHub automatically creates the matching `v<version>` tag at the pushed commit.
 

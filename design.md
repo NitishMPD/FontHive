@@ -14,7 +14,8 @@ font data stays in Electron's existing user data directory.
 - Preserve library data when uninstalling; keep the app's existing data paths.
 - Package the production output, application icon, and runtime dependencies.
   Unpack Koffi from the archive so native Windows font notifications can load.
-- Every push to `main` triggers checks, packaging, and a release with generated
+- Every push to `master` (the current default branch) or `main` triggers checks,
+  packaging, and a release with generated
   notes. CI adds its workflow run number to the base version's patch number,
   without committing generated versions back to the repository.
 - Publish the installer, blockmap, and `latest.yml` together through a draft so

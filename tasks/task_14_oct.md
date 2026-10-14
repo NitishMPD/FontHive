@@ -40,3 +40,11 @@
 - No build, app launch, push, or publication was performed. Run `pnpm dist:win`
   to test packaging, then install one published version and publish a second to
   test the actual download and restart path. Installers remain unsigned.
+
+## Completed: Release branch trigger fix
+
+- Confirmed local and GitHub default branches are `master`, while the pushed
+  workflow only listened to `main`, explaining the absence of workflow runs.
+- Added `master` to the trigger, retained `main`, and updated README and design.
+- Parsed the workflow YAML and asserted both branch triggers; whitespace checks
+  passed. No build, commit, push, or workflow execution was performed.

@@ -60,7 +60,7 @@ export default function FontGrid(): React.JSX.Element {
     count: rowCount,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowHeight,
-    overscan: 8
+    overscan: 2
   })
 
   useEffect(() => {
@@ -152,13 +152,11 @@ export default function FontGrid(): React.JSX.Element {
                 font={font}
                 selected={font.id === selectedId}
                 inSelection={selectedSet.has(font.id)}
-                style={{
-                  width: cardWidth,
-                  height: cardHeight,
-                  transform: `translate(${PAD + columnIndex * (cardWidth + GAP)}px, ${
-                    virtualRow.start + PAD
-                  }px)`
-                }}
+                width={cardWidth}
+                height={cardHeight}
+                x={PAD + columnIndex * (cardWidth + GAP)}
+                y={virtualRow.start + PAD}
+                loadPreview={!virtualizer.isScrolling}
               />
             ))
           })}

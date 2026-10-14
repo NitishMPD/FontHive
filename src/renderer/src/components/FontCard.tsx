@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { memo } from 'react'
+import { memo, useEffect, useState } from 'react'
 import type { FontRecord } from '@shared/types'
 import { useApp } from '../store'
 import { ensureFontLoaded, variationSettings } from '../lib/fontface'
@@ -18,19 +18,28 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 interface Props {
   font: FontRecord
-  style: CSSProperties
+  width: number
+  height: number
+  x: number
+  y: number
+  loadPreview: boolean
   selected: boolean
   inSelection: boolean
 }
 
-function FontCardImpl({ font, style, selected, inSelection }: Props): React.JSX.Element {
+function FontCardImpl({ font, width, height, x, y, loadPreview, selected, inSelection }: Props): React.JSX.Element {
   const settings = useApp((s) => s.settings)
   const axisValues = useApp((s) => s.axisValues[font.id])
   const toggleSelect = useApp((s) => s.toggleSelect)
   const toggleActive = useApp((s) => s.toggleActive)
   const updateFont = useApp((s) => s.updateFont)
 
-  const family = ensureFontLoaded(font)
+  const [family, setFamily] = useState<string>()
+
+  // Avoid starting font downloads and decoding for cards passed during a fling.
+  useEffect(() => {
+    if (loadPreview) setFamily(ensureFontLoaded(font))
+  }, [font, loadPreview])
 
   const fontStyle: CSSProperties = {
     fontFamily: family,
@@ -48,7 +57,7 @@ function FontCardImpl({ font, style, selected, inSelection }: Props): React.JSX.
   return (
     <article
       className={`font-card ${selected || inSelection ? 'selected' : ''}`}
-      style={style}
+      style={{ width, height, transform: `translate(${x}px, ${y}px)` }}
       onClick={handleClick}
       onDoubleClick={() => void toggleActive(font)}
       title={`${font.fullName}\n${font.provider} · ${font.category}${font.filePath ? '' : '\nNot downloaded'}`}

@@ -7,6 +7,13 @@ download installable files, activate fonts, and organise their library. The
 existing Electron, React and TypeScript application owns these interactions;
 font data stays in Electron's existing user data directory.
 
+## Font list performance
+
+- Keep the font grid virtualized with two extra rows on each side of the viewport.
+- Defer new card preview loading until scrolling stops. Cards keep any preview
+  already loaded; new cards use the UI font while scrolling.
+- Keep card layout props stable so unchanged cards skip rendering during scroll.
+
 ## Windows distribution
 
 - Ship an unsigned Windows x64 NSIS installer through GitHub Releases.

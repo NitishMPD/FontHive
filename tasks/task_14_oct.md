@@ -1,5 +1,18 @@
 # Tasks - 14 October 2026
 
+## Completed: Fast font-list scrolling
+
+- Reduced grid overscan from eight to two rows per side to limit extra cards.
+- Moved card font loading out of rendering and into an effect that waits for
+  the virtualizer to stop scrolling. Existing previews remain visible; new
+  cards inherit the UI font during scrolling.
+- Replaced freshly allocated layout objects with primitive card props so React
+  memoization can skip unchanged cards. Updated the performance design.
+- Added `pnpm check:scroll` to check deferred loading, no render-time loading,
+  and preservation of loaded previews. It and `pnpm typecheck` pass.
+- No build or live Electron profiling was run. Verify fast scrolling with
+  `pnpm dev`; actual frame-time improvement remains unmeasured.
+
 ## Completed: Windows GitHub releases
 
 - Added Electron Builder and `pnpm dist:win` to package an unsigned Windows

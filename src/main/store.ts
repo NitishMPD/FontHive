@@ -11,11 +11,16 @@ import type {
 
 export async function readJson<T>(file: string, fallback: T): Promise<T> {
   try {
-    return JSON.parse(await fs.readFile(file, 'utf8')) as T
+    const raw = await fs.readFile(file, 'utf8')
+    // Editors, PowerShell redirection and backup tools commonly prepend a UTF-8
+    // BOM, which JSON.parse rejects. Stripping it keeps a recoverable file from
+    // being quarantined as corrupt.
+    const text = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw
+    return JSON.parse(text) as T
   } catch (err) {
     const code = (err as NodeJS.ErrnoException)?.code
     if (code !== 'ENOENT') {
-      // Never let a corrupt state file brick the app: park it and continue empty.
+      // Never let a genuinely corrupt state file brick the app: park it and continue empty.
       try {
         await fs.rename(file, `${file}.corrupt-${Date.now()}`)
       } catch {

@@ -94,15 +94,16 @@ function providerInfos(): ProviderInfo[] {
 /* Local scanning                                                      */
 /* ------------------------------------------------------------------ */
 
-async function resolveLocalRoots(): Promise<string[]> {
+async function resolveLocalRoots(includeSystem: boolean): Promise<string[]> {
   const roots = store.folders.filter((f) => f.enabled).map((f) => f.path)
-  roots.push(...(await systemFontDirs()))
+  if (includeSystem) roots.push(...(await systemFontDirs()))
   return [...new Set(roots.map((r) => path.normalize(r)))].filter(Boolean)
 }
 
-async function scanLocal(): Promise<ScanResult> {
+async function scanLocal(options: { includeSystem?: boolean } = {}): Promise<ScanResult> {
+  const { includeSystem = true } = options
   const started = Date.now()
-  const roots = await resolveLocalRoots()
+  const roots = await resolveLocalRoots(includeSystem)
   const errors: string[] = []
   const collected: FontRecord[] = []
   const seenIds = new Set<string>()
@@ -121,9 +122,15 @@ async function scanLocal(): Promise<ScanResult> {
     }
   }
 
-  // Local files disappear when a user removes them; drop records whose file is gone.
+  // Prune only faces that live under a root we actually inspected this pass, so
+  // a folders-only scan never drops the system fonts indexed by an earlier one.
   const retained = store.fonts.filter((font) => {
     if (font.provider !== 'local') return true
+    if (!font.filePath) return true
+    const underScannedRoot = roots.some((root) =>
+      font.filePath!.toLowerCase().startsWith(root.toLowerCase())
+    )
+    if (!underScannedRoot) return true
     return seenIds.has(font.id)
   })
   const removed = store.fonts.length - retained.length
@@ -402,7 +409,24 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('remove-folder', (_e, target: string) => {
+    const normalized = path.normalize(target).toLowerCase()
     store.setFolders(store.folders.filter((f) => path.normalize(f.path) !== path.normalize(target)))
+
+    // A removed folder is no longer in the scan roots, so pruning would skip its
+    // faces. Drop them explicitly; anything also provided by a system directory
+    // is restored by the rescan below.
+    const pruned = store.fonts.filter(
+      (font) =>
+        !(
+          font.provider === 'local' &&
+          font.filePath &&
+          font.filePath.toLowerCase().startsWith(normalized)
+        )
+    )
+    if (pruned.length !== store.fonts.length) {
+      store.setFonts(pruned)
+      void scanLocal()
+    }
     return store.folders
   })
 
@@ -523,9 +547,13 @@ app.whenReady().then(async () => {
   registerIpc()
   createWindow()
 
-  // First run: index the system fonts so the library is never empty.
+  // First run: index the system fonts so the library is never empty. Afterwards,
+  // keep watched folders in sync in the background without paying for a full
+  // system rescan on every launch.
   if (store.fonts.length === 0) {
     void scanLocal()
+  } else if (store.folders.some((f) => f.enabled)) {
+    void scanLocal({ includeSystem: false })
   }
 
   app.on('activate', () => {

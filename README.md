@@ -11,6 +11,10 @@ for font parsing.
 
 **Library**
 - Recursive scanning of system font directories plus any folders you add, including network shares
+- Watched folders are re-scanned in the background on launch, so newly added fonts appear
+  without a manual refresh; removing a folder also removes the faces it contributed
+- Catalogue fetches are de-duplicated, so families listed twice under different slugs
+  or types cannot produce duplicate library entries
 - TrueType collections (`.ttc`/`.otc`) are expanded into their individual faces
 - Category classification from the font's PANOSE record, not just its name
 - Virtualised grid, so tens of thousands of faces stay smooth
@@ -107,6 +111,12 @@ State lives under Electron's `userData` directory (`%APPDATA%\fb-rea`):
 Deleting `library.json` forces a full re-index on next launch.
 `schemaVersion` in that file invalidates derived fields when the classification
 logic changes, re-indexing local faces automatically.
+
+The reader tolerates a UTF-8 BOM, since editors, PowerShell redirection and
+backup tools commonly add one and `JSON.parse` rejects it — without that, a
+perfectly recoverable file would be quarantined. A file that is genuinely
+unparseable is renamed to `library.json.corrupt-<timestamp>` and the app starts
+with an empty library rather than failing to launch.
 
 ## Notes and limitations
 

@@ -48,8 +48,8 @@ export default function FontGrid(): React.JSX.Element {
   const usable = Math.max(0, width - PAD * 2 - GAP * (columns - 1))
   const cardWidth = usable > 0 ? Math.floor(usable / columns) : 0
 
-  const previewHeight = Math.round(settings.previewSize * 1.24 * 2)
-  const cardHeight = 86 + previewHeight
+  // Fixed chrome (head, alphabet sample, tags) plus one line of preview text.
+  const cardHeight = 212 + Math.round(settings.previewSize * 1.25)
   const rowHeight = cardHeight + GAP
 
   const rowCount = Math.ceil(visible.length / columns)

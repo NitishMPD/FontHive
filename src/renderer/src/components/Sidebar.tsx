@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useApp } from '../store'
 import Icon from './Icon'
+import Logo from './Logo'
 import type { ProviderId } from '@shared/types'
 
 const PROVIDER_ORDER: ProviderId[] = ['local', 'google', 'fontsource', 'bunny']
@@ -17,28 +18,38 @@ export default function Sidebar(): React.JSX.Element {
   const busy = useApp((s) => s.busy)
 
   const activeCount = useMemo(() => fonts.filter((f) => f.active).length, [fonts])
+  const favoriteCount = useMemo(() => fonts.filter((f) => f.favorite).length, [fonts])
   const onLibrary = view.kind === 'library'
 
   const browseLibrary = (patch: Parameters<typeof setFilters>[0]): void => {
-    setFilters({ collectionId: null, providers: [], onlyActive: false, ...patch })
+    setFilters({ collectionId: null, providers: [], onlyActive: false, onlyFavorites: false, ...patch })
     setView({ kind: 'library' })
   }
 
   return (
     <aside className="sidebar">
       <div className="brand">
-        <h1>Font Library</h1>
-        <span>{fonts.length.toLocaleString()} faces</span>
+        <Logo />
+        <h1>Font Hive</h1>
       </div>
 
       <nav className="nav">
         <button
-          className={`nav-item ${onLibrary && !filters.providers.length && !filters.onlyActive && !filters.collectionId ? 'active' : ''}`}
+          className={`nav-item ${onLibrary && !filters.providers.length && !filters.onlyActive && !filters.onlyFavorites && !filters.collectionId ? 'active' : ''}`}
           onClick={() => browseLibrary({})}
         >
           <Icon name="library" />
-          <span className="label">All fonts</span>
+          <span className="label">Browse Fonts</span>
           <span className="count">{fonts.length.toLocaleString()}</span>
+        </button>
+
+        <button
+          className={`nav-item ${onLibrary && filters.onlyFavorites ? 'active' : ''}`}
+          onClick={() => browseLibrary({ onlyFavorites: true })}
+        >
+          <Icon name="heart" />
+          <span className="label">Favorites</span>
+          <span className="count">{favoriteCount}</span>
         </button>
 
         <button
@@ -50,7 +61,7 @@ export default function Sidebar(): React.JSX.Element {
           <span className="count">{activeCount}</span>
         </button>
 
-        <div className="nav-section">Catalogue sources</div>
+        <div className="nav-section">Sources</div>
         {PROVIDER_ORDER.map((id) => {
           const info = providers.find((p) => p.id === id)
           if (!info) return null

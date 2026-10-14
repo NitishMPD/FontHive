@@ -31,7 +31,7 @@ const MIME: Record<string, string> = {
 
 protocol.registerSchemesAsPrivileged([
   {
-    scheme: 'rea-font',
+    scheme: 'hive-font',
     privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true }
   }
 ])
@@ -489,7 +489,7 @@ function createWindow(): void {
     minHeight: 680,
     show: false,
     backgroundColor: '#0e1013',
-    title: 'Font Library',
+    title: 'Font Hive',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
@@ -525,7 +525,7 @@ app.whenReady().then(async () => {
   activator = await Activator.open()
   reconcileActive()
 
-  protocol.handle('rea-font', async (request) => {
+  protocol.handle('hive-font', async (request) => {
     try {
       const url = new URL(request.url)
       const id = decodeURIComponent(url.pathname.replace(/^\//, ''))

@@ -1,4 +1,4 @@
-# Font Library
+# Font Hive
 
 A personal font manager for Windows. Indexes every font on the machine alongside
 downloadable catalogues, renders live previews, installs and removes fonts from
@@ -83,7 +83,7 @@ pnpm check:providers # verify provider catalogues and the native binding
 src/
   shared/types.ts        Contract shared by main, preload and renderer
   main/
-    index.ts             App lifecycle, IPC, rea-font:// protocol, downloads
+    index.ts             App lifecycle, IPC, hive-font:// protocol, downloads
     store.ts             Debounced atomic JSON persistence
     fonts/
       scanner.ts         Directory walking with bounded concurrency
@@ -96,13 +96,13 @@ src/
     lib/                 Font loading, filtering and smart-rule evaluation
 ```
 
-Fonts are served to the renderer over a custom `rea-font://` protocol rather
+Fonts are served to the renderer over a custom `hive-font://` protocol rather
 than `file://`, so the renderer keeps `contextIsolation` with no filesystem
 access of its own.
 
 ## Data locations
 
-State lives under Electron's `userData` directory (`%APPDATA%\fb-rea`):
+State lives under Electron's `userData` directory (`%APPDATA%\font-hive`):
 
 - `library.json` — the indexed library, collections, folders and settings
 - `activated.json` — which faces are installed and where

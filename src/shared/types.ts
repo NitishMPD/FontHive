@@ -66,6 +66,7 @@ export interface FontRecord {
   collections: string[]
   tags: string[]
   rating?: number
+  favorite?: boolean
   note?: string
   addedAt: number
 }
@@ -178,6 +179,7 @@ export interface UpdateFontPatch {
   collections?: string[]
   tags?: string[]
   rating?: number
+  favorite?: boolean
   note?: string
 }
 

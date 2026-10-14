@@ -2,6 +2,7 @@ interface IconProps {
   name: IconName
   size?: number
   className?: string
+  filled?: boolean
 }
 
 export type IconName =
@@ -20,6 +21,10 @@ export type IconName =
   | 'eye'
   | 'layers'
   | 'external'
+  | 'heart'
+  | 'grid'
+  | 'list'
+  | 'chevron'
 
 const PATHS: Record<IconName, string> = {
   library: 'M4 5h6v14H4zM14 5h6v14h-6z',
@@ -37,16 +42,20 @@ const PATHS: Record<IconName, string> = {
   sparkle: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z',
   eye: 'M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6zM12 15a3 3 0 100-6 3 3 0 000 6z',
   layers: 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5',
+  heart: 'M12 20s-7-4.5-9-9a5 5 0 019-3 5 5 0 019 3c-2 4.5-9 9-9 9z',
+  grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  list: 'M4 6h16M4 12h16M4 18h16',
+  chevron: 'M6 9l6 6 6-6',
   external: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5'
 }
 
-export default function Icon({ name, size = 15, className }: IconProps): React.JSX.Element {
+export default function Icon({ name, size = 15, className, filled }: IconProps): React.JSX.Element {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor"
       strokeWidth={1.8}
       strokeLinecap="round"

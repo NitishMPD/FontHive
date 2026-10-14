@@ -2,20 +2,20 @@ import type { FontRecord } from '@shared/types'
 
 /**
  * Fonts are loaded lazily, one face at a time, only when a card becomes visible.
- * Local and downloaded files are served over the `rea-font://` protocol; remote
+ * Local and downloaded files are served over the `hive-font://` protocol; remote
  * catalogue faces use the provider's CSS endpoint where one exists.
  */
 const injected = new Set<string>()
 
 function localFamilyName(font: FontRecord): string {
-  return `rea-${font.id.replace(/[^a-z0-9]+/gi, '_')}`
+  return `hive-${font.id.replace(/[^a-z0-9]+/gi, '_')}`
 }
 
 function injectFace(css: string, key: string): void {
   if (injected.has(key)) return
   injected.add(key)
   const style = document.createElement('style')
-  style.dataset.reaFace = key
+  style.dataset.hiveFace = key
   style.textContent = css
   document.head.appendChild(style)
 }
@@ -29,7 +29,7 @@ export function ensureFontLoaded(font: FontRecord): string {
   if (font.filePath) {
     const family = localFamilyName(font)
     injectFace(
-      `@font-face{font-family:'${family}';src:url('rea-font://font/${encodeURIComponent(
+      `@font-face{font-family:'${family}';src:url('hive-font://font/${encodeURIComponent(
         font.id
       )}');font-weight:${font.weight};font-style:${font.style};font-display:swap;}`,
       family
@@ -44,7 +44,7 @@ export function ensureFontLoaded(font: FontRecord): string {
       const link = document.createElement('link')
       link.rel = 'stylesheet'
       link.href = font.previewUrl
-      link.dataset.reaFace = font.previewUrl
+      link.dataset.hiveFace = font.previewUrl
       document.head.appendChild(link)
     }
     return `'${font.family}'`

@@ -1,5 +1,7 @@
 import type { Collection, FontRecord, SmartCondition, SmartRule } from '@shared/types'
 
+export type SortKey = 'name' | 'newest' | 'weight'
+
 export interface Filters {
   query: string
   providers: string[]
@@ -7,6 +9,8 @@ export interface Filters {
   onlyActive: boolean
   onlyInstalled: boolean
   variableOnly: boolean
+  onlyFavorites: boolean
+  sort: SortKey
   collectionId: string | null
 }
 
@@ -17,6 +21,8 @@ export const emptyFilters: Filters = {
   onlyActive: false,
   onlyInstalled: false,
   variableOnly: false,
+  onlyFavorites: false,
+  sort: 'name',
   collectionId: null
 }
 
@@ -103,15 +109,25 @@ export function applyFilters(
     if (collection) pool = collectionMembers(pool, collection)
   }
 
-  return pool.filter((font) => {
+  const matched = pool.filter((font) => {
     if (!matchesQuery(font, filters.query)) return false
     if (filters.providers.length && !filters.providers.includes(font.provider)) return false
     if (filters.categories.length && !filters.categories.includes(font.category)) return false
     if (filters.onlyActive && !font.active) return false
     if (filters.onlyInstalled && !font.filePath) return false
     if (filters.variableOnly && !font.axes.length) return false
+    if (filters.onlyFavorites && !font.favorite) return false
     return true
   })
+
+  const byName = (a: FontRecord, b: FontRecord): number =>
+    a.family.localeCompare(b.family) || a.weight - b.weight
+  const order: Record<SortKey, (a: FontRecord, b: FontRecord) => number> = {
+    name: byName,
+    newest: (a, b) => b.addedAt - a.addedAt || byName(a, b),
+    weight: (a, b) => a.weight - b.weight || byName(a, b)
+  }
+  return matched.sort(order[filters.sort])
 }
 
 export const CATEGORIES = [

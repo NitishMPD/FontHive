@@ -165,6 +165,7 @@ export class Store {
           collections: existing.collections,
           tags: existing.tags,
           rating: existing.rating,
+          favorite: existing.favorite,
           note: existing.note,
           addedAt: existing.addedAt
         })

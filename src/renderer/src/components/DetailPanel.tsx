@@ -17,6 +17,7 @@ export default function DetailPanel({ font }: { font: FontRecord }): React.JSX.E
   const busy = useApp((s) => s.busy)
 
   const [tagDraft, setTagDraft] = useState('')
+  const [tab, setTab] = useState<'overview' | 'organize'>('overview')
 
   const family = ensureFontLoaded(font)
   const values = useMemo(
@@ -66,6 +67,17 @@ export default function DetailPanel({ font }: { font: FontRecord }): React.JSX.E
         {settings.previewText || 'The quick brown fox jumps over the lazy dog'}
       </div>
 
+      <div className="tabs">
+        <button className={tab === 'overview' ? 'on' : ''} onClick={() => setTab('overview')}>
+          Overview
+        </button>
+        <button className={tab === 'organize' ? 'on' : ''} onClick={() => setTab('organize')}>
+          Organize
+        </button>
+      </div>
+
+      {tab === 'overview' && (
+        <>
       <div className="detail-section">
         <div className="row">
           <button
@@ -159,6 +171,11 @@ export default function DetailPanel({ font }: { font: FontRecord }): React.JSX.E
         </dl>
       </div>
 
+        </>
+      )}
+
+      {tab === 'organize' && (
+        <>
       <div className="detail-section">
         <h3>Rating</h3>
         <div className="row">
@@ -239,6 +256,8 @@ export default function DetailPanel({ font }: { font: FontRecord }): React.JSX.E
           onChange={(event) => void updateFont(font.id, { note: event.target.value })}
         />
       </div>
+        </>
+      )}
     </aside>
   )
 }

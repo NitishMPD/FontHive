@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useApp } from './store'
 import Sidebar from './components/Sidebar'
 import Toolbar from './components/Toolbar'
@@ -16,6 +16,7 @@ import Skeleton from './components/Skeleton'
 import { usePresence } from './lib/usePresence'
 
 export default function App(): React.JSX.Element {
+  const [startupError, setStartupError] = useState<string | null>(null)
   const ready = useApp((s) => s.ready)
   const view = useApp((s) => s.view)
   const selectedId = useApp((s) => s.selectedId)
@@ -27,7 +28,7 @@ export default function App(): React.JSX.Element {
     const unsubscribe = window.api.onAppUpdate((appUpdate) => {
       useApp.setState((state) => (state.appUpdate?.revision ?? -1) < appUpdate.revision ? { appUpdate } : {})
     })
-    void init()
+    void init().catch((error: unknown) => setStartupError(String(error)))
     return unsubscribe
   }, [init])
 
@@ -46,6 +47,16 @@ export default function App(): React.JSX.Element {
   const selectedFont = selectedId ? fonts.find((f) => f.id === selectedId) ?? null : null
   const { item: selected, leaving } = usePresence(selectedFont)
 
+  if (startupError) return (
+    <div className="shell">
+      <TitleBar />
+      <main className="panel" role="alert">
+        <h2>Your library could not be opened</h2>
+        <p>{startupError}</p>
+        <button className="btn" onClick={() => { setStartupError(null); void init().catch((error: unknown) => setStartupError(String(error))) }}>Try again</button>
+      </main>
+    </div>
+  )
   if (!ready) return <Skeleton />
 
   // Browsing a collection is a filter on the grid; editing one is its own view.

@@ -1,4 +1,5 @@
 import type { FontRecord } from '@shared/types'
+import { fontPreviewUrl } from './desktop'
 
 /**
  * Fonts are loaded lazily, one face at a time, only when a card becomes visible.
@@ -29,10 +30,8 @@ export function ensureFontLoaded(font: FontRecord): string {
   if (font.filePath) {
     const family = localFamilyName(font)
     injectFace(
-      `@font-face{font-family:'${family}';src:url('hive-font://font/${encodeURIComponent(
-        font.id
-      )}');font-weight:${font.weight};font-style:${font.style};font-display:swap;}`,
-      family
+      `@font-face{font-family:'${family}';src:url('${fontPreviewUrl(font.id)}');font-weight:${font.weight};font-style:${font.style};font-display:swap;}`,
+      `${family}:${font.filePath}:${font.faceIndex ?? 0}`
     )
     return family
   }

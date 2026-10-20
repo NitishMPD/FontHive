@@ -2,70 +2,39 @@
   "name": "font-hive",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "Font Hive: personal font manager: indexed library, pluggable providers, granular activation",
-  "main": "./out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "dist:win": "pnpm build && electron-builder --win --x64 --publish never",
-    "preview": "electron-vite preview",
+    "dev": "node tools/desktop.cjs tauri dev",
+    "dev:web": "vite",
+    "build": "node tools/desktop.cjs tauri build",
+    "build:web": "vite build",
+    "dist:win": "node tools/desktop.cjs tauri build --target x86_64-pc-windows-msvc --bundles nsis",
+    "tauri": "node tools/desktop.cjs tauri",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "check:rust": "node tools/desktop.cjs cargo check --manifest-path src-tauri/Cargo.toml",
+    "test:rust": "node tools/desktop.cjs cargo test --manifest-path src-tauri/Cargo.toml",
     "check:scroll": "node tools/scroll-check.cjs",
-    "check:providers": "esbuild tools/provider-check.ts --bundle --platform=node --format=cjs --target=node20 --outfile=tools/provider-check.built.cjs --external:fontkit --external:koffi --log-level=error && node tools/provider-check.built.cjs",
     "check:fuzzy": "esbuild tools/fuzzy-check.ts --bundle --platform=node --format=cjs --target=node20 --outfile=tools/fuzzy-check.built.cjs --log-level=error && node tools/fuzzy-check.built.cjs",
-    "check:updates": "node tools/release-version.cjs --check && esbuild tools/update-check.ts --bundle --platform=node --format=cjs --target=node20 --outfile=tools/update-check.built.cjs --log-level=error && node tools/update-check.built.cjs"
-  },
-  "build": {
-    "appId": "com.nitishmpd.fonthive",
-    "productName": "Font Hive",
-    "publish": {
-      "provider": "github",
-      "owner": "NitishMPD",
-      "repo": "FontHive",
-      "releaseType": "release"
-    },
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "out/**/*",
-      "resources/icon.png"
-    ],
-    "asarUnpack": [
-      "node_modules/koffi/**/*"
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "resources/icon.ico",
-      "artifactName": "Font-Hive-${version}-${arch}-Setup.${ext}"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "deleteAppDataOnUninstall": false
-    }
-  },
-  "dependencies": {
-    "electron-updater": "^6.8.9",
-    "fontkit": "^2.0.4",
-    "koffi": "^2.9.0"
+    "check:updates": "node tools/release-version.cjs --check && node tools/update-manifest.cjs --check",
+    "check:providers": "node tools/desktop.cjs cargo test --manifest-path src-tauri/Cargo.toml providers::tests::live_catalogues_and_installable_downloads -- --ignored --nocapture"
   },
   "devDependencies": {
     "@phosphor-icons/react": "^2.1.10",
     "@tanstack/react-virtual": "^3.11.2",
+    "@tauri-apps/cli": "^2.12.3",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.3.4",
-    "electron": "^33.3.1",
-    "electron-builder": "^26.15.3",
-    "electron-vite": "^2.3.0",
     "esbuild": "^0.25.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.7.3",
     "vite": "^6.0.7",
     "zustand": "^5.0.3"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.12.4"
   }
 }

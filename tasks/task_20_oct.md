@@ -1,0 +1,8 @@
+# Tasks - 20 October 2026
+
+- Added an MIT `LICENSE`, the `license` field in `package.json`, and a README top section with a download link, the SmartScreen note, a screenshot (`docs/screenshot.png`) and a License section. No build, commit or push was run.
+- Replaced Electron with Tauri 2 and a Rust backend, preserving the React UI, library paths and IDs; added collection-face previews, Windows activation, signed updater packaging and migration backups. Split project/design docs and updated release instructions. TypeScript, Rust checks, eight Rust tests (including live providers), search, scroll and release-metadata checks passed; installer builds and native UI/update verification remain user-run.
+- Fixed Tauri/Cargo commands in terminals missing Rust from PATH by resolving the standard Rust installation for child processes. Verified CLI and Cargo metadata discovery; documented the separate Windows C++ toolchain prerequisite. No build or app launch was run.
+- Fixed the updater password prompt by explicitly defaulting to the initial key's empty password. Signed the user's existing 2.43 MiB installer successfully without rebuilding; updated signing instructions and the measured installer size.
+- Fixed false Windows activation conflicts by normalizing case and path separators for registry comparisons, reconciliation and shared-file detection. Rust check and the regression test passed without modifying installed fonts.
+- Set installer publisher metadata to Nitish while preserving GitHub update URLs; documented the separate Authenticode signer requirement. Rust/configuration check passed; no installer rebuild was run.

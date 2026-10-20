@@ -1317,17 +1317,47 @@ textarea {
   display: flex;
   align-items: center;
   gap: 10px;
-  /* Leaves room for the native caption buttons Windows draws over the right edge. */
-  padding: 0 150px 0 14px;
+  padding: 0 0 0 14px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
   color: var(--text);
-  -webkit-app-region: drag;
   user-select: none;
 }
 
-.titlebar button {
-  -webkit-app-region: no-drag;
+.window-controls {
+  display: flex;
+  align-self: stretch;
+  margin-left: 4px;
+}
+
+.window-controls button {
+  width: 46px;
+  border: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  color: var(--text-dim);
+}
+
+.window-controls button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.window-controls .window-close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+.window-controls button:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: -3px;
+}
+
+.window-controls svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
 }
 
 .titlebar-name {

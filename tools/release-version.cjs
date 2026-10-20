@@ -23,6 +23,12 @@ if (require.main === module) {
     const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
     pkg.version = releaseVersion(pkg.version, process.env.GITHUB_RUN_NUMBER)
     fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n')
+    const cargoPath = 'src-tauri/Cargo.toml'
+    const cargo = fs.readFileSync(cargoPath, 'utf8').replace(/^(version\s*=\s*)"[^"]+"/m, `$1"${pkg.version}"`)
+    fs.writeFileSync(cargoPath, cargo)
+    const lockPath = 'src-tauri/Cargo.lock'
+    const lock = fs.readFileSync(lockPath, 'utf8').replace(/(\[\[package\]\]\r?\nname = "font-hive"\r?\nversion = )"[^"]+"/, `$1"${pkg.version}"`)
+    fs.writeFileSync(lockPath, lock)
     console.log(`Release version: ${pkg.version}`)
   }
 }

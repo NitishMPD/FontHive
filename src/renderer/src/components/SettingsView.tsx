@@ -101,7 +101,7 @@ export default function SettingsView(): React.JSX.Element {
           <h3>About</h3>
         </div>
         <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
-          A personal font manager built with Electron, React and fontkit. Catalogues come from the
+          A personal font manager built with Tauri, Rust and React. Catalogues come from the
           public Google Fonts, Bunny Fonts and Fontsource endpoints; fonts themselves stay on this
           machine.
         </p>

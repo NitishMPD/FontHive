@@ -126,6 +126,22 @@ if using an encrypted key. Never commit a private key or generate a new key
 for each release. The initial local key uses an empty password; project commands
 pass that explicitly so signing does not prompt. If you replace it with an
 encrypted key, set `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` to its password.
+To upload the existing private key without copying or reformatting it, run from
+the project root with an authenticated GitHub CLI:
+
+```powershell
+Get-Content -Raw .keys/tauri-updater.key | gh secret set TAURI_SIGNING_PRIVATE_KEY --repo NitishMPD/FontHive
+```
+
+The secret must contain the entire file, including base64 padding, without extra
+quotes or encoding. A path such as `.keys/tauri-updater.key` cannot resolve on the
+GitHub runner. An `Invalid padding` error after installer creation indicates
+invalid key encoding; replacing the secret with the unchanged file contents
+addresses that input error. Preserve the existing key pair.
+The workflow checks signing on a temporary file before compilation and stops
+early for missing/invalid keys or an incorrect password, without logging secrets.
+After correcting the secret, rerun the failed GitHub Actions job.
+
 For a local signed package:
 
 ```powershell

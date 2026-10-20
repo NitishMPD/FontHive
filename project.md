@@ -59,6 +59,10 @@ No Electron, Node runtime, Chromium bundle, Fontkit or Koffi ships with the app.
   TAURI_SIGNING_PRIVATE_KEY_PASSWORD. The initial private key is ignored under
   .keys/tauri-updater.key; its public key is committed in tauri.conf.json. Back
   up the private key securely and preserve it for future releases.
+- Validate the release signing key and password with Tauri on a temporary file
+  before Rust setup and compilation. Never log signing credentials. The GitHub
+  secret must contain the complete key file contents, including base64 padding,
+  rather than a local path, public key, shell command or an extra encoding.
 - Tauri updater signatures verify update authenticity. They do not provide
   Windows Authenticode publisher identity or remove SmartScreen warnings.
   Windows code signing and other platform installers remain separate work.

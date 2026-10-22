@@ -11,6 +11,7 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "check:scroll": "node tools/scroll-check.cjs",
+    "check:install": "node tools/install-check.cjs",
     "check:providers": "esbuild tools/provider-check.ts --bundle --platform=node --format=cjs --target=node20 --outfile=tools/provider-check.built.cjs --external:fontkit --external:koffi --log-level=error && node tools/provider-check.built.cjs",
     "check:fuzzy": "esbuild tools/fuzzy-check.ts --bundle --platform=node --format=cjs --target=node20 --outfile=tools/fuzzy-check.built.cjs --log-level=error && node tools/fuzzy-check.built.cjs",
     "check:updates": "node tools/release-version.cjs --check && esbuild tools/update-check.ts --bundle --platform=node --format=cjs --target=node20 --outfile=tools/update-check.built.cjs --log-level=error && node tools/update-check.built.cjs"

@@ -1,0 +1,1 @@
+- Added provider-scoped family install, accessible card multi-selection, filtered Select all, and batch Install selected; reused activation with installed-font skipping and request protection. Updated project/design docs and passed type-check, install/selection checks, and scroll checks.

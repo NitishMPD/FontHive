@@ -15,6 +15,10 @@ export default function DetailPanel({ font, leaving }: { font: FontRecord; leavi
   const download = useApp((s) => s.download)
   const select = useApp((s) => s.select)
   const busy = useApp((s) => s.busy)
+  const fonts = useApp((s) => s.fonts)
+  const installFamily = useApp((s) => s.installFamily)
+  const familyFonts = useMemo(() => fonts.filter((face) => face.familyId === font.familyId), [fonts, font.familyId])
+  const remaining = familyFonts.filter((face) => !face.active).length
 
   const [tagDraft, setTagDraft] = useState('')
   const [tab, setTab] = useState<'overview' | 'organize'>('overview')
@@ -87,7 +91,7 @@ export default function DetailPanel({ font, leaving }: { font: FontRecord; leavi
             onClick={() => void toggleActive(font)}
           >
             <Icon name={font.active ? 'close' : 'check'} size={14} />
-            {font.active ? 'Deactivate' : 'Activate'}
+            {font.active ? 'Deactivate' : 'Install'}
           </button>
 
           {!font.filePath && (
@@ -102,6 +106,17 @@ export default function DetailPanel({ font, leaving }: { font: FontRecord; leavi
             </button>
           )}
         </div>
+
+        <button
+          className="btn"
+          style={{ width: '100%', marginTop: 8 }}
+          title={`Install all ${familyFonts.length} styles of ${font.family} from ${font.provider}`}
+          disabled={Boolean(busy) || remaining === 0}
+          onClick={() => void installFamily(font.familyId)}
+        >
+          <Icon name="check" size={14} />
+          {remaining ? `Install family (${remaining})` : 'Family installed'}
+        </button>
 
         {!font.filePath && (
           <p className="muted" style={{ fontSize: 11.5, margin: '8px 0 0' }}>

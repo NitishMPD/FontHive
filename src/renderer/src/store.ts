@@ -11,7 +11,7 @@ import type {
   UpdateFontPatch,
   WatchedFolder
 } from '@shared/types'
-import { emptyFilters, type Filters } from './lib/filter'
+import { applyFilters, emptyFilters, type Filters } from './lib/filter'
 import { defaultAxisValues } from './lib/fontface'
 
 export type View =
@@ -57,11 +57,13 @@ interface AppState {
   select: (id: string | null) => void
   toggleSelect: (id: string, additive: boolean) => void
   clearSelection: () => void
+  selectAll: () => void
 
   setAxis: (fontId: string, tag: string, value: number) => void
   resetAxes: (fontId: string) => void
 
   activate: (ids: string[]) => Promise<void>
+  installFamily: (familyId: string) => Promise<void>
   deactivate: (ids: string[]) => Promise<void>
   toggleActive: (font: FontRecord) => Promise<void>
 
@@ -174,6 +176,11 @@ export const useApp = create<AppState>((set, get) => ({
 
   clearSelection: () => set({ selection: [] }),
 
+  selectAll: () => {
+    const { fonts, filters, collections } = get()
+    set({ selection: applyFilters(fonts, filters, collections).fonts.map((font) => font.id) })
+  },
+
   setAxis: (fontId, tag, value) => {
     const font = get().fonts.find((f) => f.id === fontId)
     const base = get().axisValues[fontId] ?? (font ? defaultAxisValues(font) : {})
@@ -187,15 +194,20 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async activate(ids) {
+    if (get().busy) return
+    const requested = new Set(ids)
+    ids = get().fonts.filter((font) => requested.has(font.id) && !font.active).map((font) => font.id)
     if (!ids.length) return
-    set({ busy: `Activating ${ids.length} font${ids.length > 1 ? 's' : ''}…` })
+    set({ busy: `Installing ${ids.length} font${ids.length > 1 ? 's' : ''}…` })
     try {
       const result = await window.api.activate(ids)
       if (result.failed.length) {
         get().toast(
-          `${result.changed.length} activated, ${result.failed.length} failed: ${result.failed[0].error}`,
+          `${result.changed.length} installed, ${result.failed.length} failed: ${result.failed[0].error}`,
           'error'
         )
+      } else {
+        get().toast(`Installed ${result.changed.length} font${result.changed.length === 1 ? '' : 's'}`, 'success')
       }
     } catch (err) {
       get().toast((err as Error).message, 'error')
@@ -204,7 +216,12 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
 
+  async installFamily(familyId) {
+    await get().activate(get().fonts.filter((font) => font.familyId === familyId).map((font) => font.id))
+  },
+
   async deactivate(ids) {
+    if (get().busy) return
     if (!ids.length) return
     set({ busy: `Deactivating ${ids.length}…` })
     try {

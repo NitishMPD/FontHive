@@ -33,6 +33,7 @@ function FontCardImpl({ font, width, height, x, y, loadPreview, selected, inSele
   const toggleSelect = useApp((s) => s.toggleSelect)
   const toggleActive = useApp((s) => s.toggleActive)
   const updateFont = useApp((s) => s.updateFont)
+  const busy = useApp((s) => s.busy)
 
   const [family, setFamily] = useState<string>()
 
@@ -63,6 +64,14 @@ function FontCardImpl({ font, width, height, x, y, loadPreview, selected, inSele
       title={`${font.fullName}\n${font.provider} · ${font.category}${font.filePath ? '' : '\nNot downloaded'}`}
     >
       <div className="font-card-head">
+        <input
+          type="checkbox"
+          checked={inSelection}
+          aria-label={`Select ${font.fullName} (${font.provider})`}
+          onClick={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
+          onChange={() => toggleSelect(font.id, true)}
+        />
         <div className="font-card-title">
           <span className="font-card-family">{font.family}</span>
         </div>
@@ -103,7 +112,9 @@ function FontCardImpl({ font, width, height, x, y, loadPreview, selected, inSele
           className={`switch ${font.active ? 'on' : ''}`}
           role="switch"
           aria-checked={font.active}
-          title={font.active ? 'Deactivate' : 'Activate'}
+          aria-label={`${font.active ? 'Deactivate' : 'Install'} ${font.fullName}`}
+          title={font.active ? 'Deactivate' : 'Install'}
+          disabled={Boolean(busy)}
           onClick={(event) => {
             event.stopPropagation()
             void toggleActive(font)

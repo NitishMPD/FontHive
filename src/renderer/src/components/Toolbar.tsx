@@ -31,6 +31,8 @@ export default function Toolbar(): React.JSX.Element {
   const saveSettings = useApp((s) => s.saveSettings)
   const selection = useApp((s) => s.selection)
   const clearSelection = useApp((s) => s.clearSelection)
+  const selectAll = useApp((s) => s.selectAll)
+  const view = useApp((s) => s.view)
   const activate = useApp((s) => s.activate)
   const deactivate = useApp((s) => s.deactivate)
   const download = useApp((s) => s.download)
@@ -154,8 +156,13 @@ export default function Toolbar(): React.JSX.Element {
         </Dropdown>
       </div>
 
-      {(dirty || selection.length > 0) && (
+      {(view.kind === 'library' || dirty || selection.length > 0) && (
         <div className="toolbar-row sub">
+          {view.kind === 'library' && (
+            <button className="btn sm" title="Select all filtered fonts, including those off screen" onClick={selectAll}>
+              Select all
+            </button>
+          )}
           {dirty ? (
             <button
               className="btn sm ghost"
@@ -168,8 +175,8 @@ export default function Toolbar(): React.JSX.Element {
           {selection.length > 0 && (
             <>
               <strong style={{ fontSize: 12.5 }}>{selection.length} selected</strong>
-              <button className="btn sm" title="Activate" disabled={Boolean(busy)} onClick={() => void activate(selection)}>
-                <Icon name="check" size={14} />
+              <button className="btn sm primary" disabled={Boolean(busy)} onClick={() => void activate(selection)}>
+                <Icon name="check" size={14} /> Install selected
               </button>
               <button className="btn sm" title="Deactivate" disabled={Boolean(busy)} onClick={() => void deactivate(selection)}>
                 <Icon name="power" size={14} />

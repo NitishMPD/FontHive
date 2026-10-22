@@ -19,7 +19,7 @@ const SORTS: { key: SortKey; label: string }[] = [
 ]
 
 const PROPERTIES = [
-  { key: 'onlyActive', label: 'Active' },
+  { key: 'onlyActive', label: 'Installed' },
   { key: 'onlyInstalled', label: 'Downloaded' },
   { key: 'variableOnly', label: 'Variable' }
 ] as const
@@ -32,11 +32,18 @@ export default function Toolbar(): React.JSX.Element {
   const selection = useApp((s) => s.selection)
   const clearSelection = useApp((s) => s.clearSelection)
   const selectAll = useApp((s) => s.selectAll)
+  const selectFamily = useApp((s) => s.selectFamily)
   const view = useApp((s) => s.view)
   const activate = useApp((s) => s.activate)
   const deactivate = useApp((s) => s.deactivate)
   const download = useApp((s) => s.download)
   const busy = useApp((s) => s.busy)
+  const providers = useApp((s) => s.providers)
+  const refreshProvider = useApp((s) => s.refreshProvider)
+  const source = filters.providers.length === 1 ? providers.find((p) => p.id === filters.providers[0] && p.paged) : undefined
+  const searchSource = (): void => {
+    if (source && !busy) void refreshProvider(source.id, { query: filters.query.trim(), page: 1 })
+  }
 
   const toggleCategory = (category: string): void => {
     const next = filters.categories.includes(category)
@@ -64,6 +71,7 @@ export default function Toolbar(): React.JSX.Element {
             value={filters.query}
             placeholder="Search fonts, designers, or styles…"
             onChange={(event) => setFilters({ query: event.target.value })}
+            onKeyDown={(event) => { if (event.key === 'Enter') searchSource() }}
             spellCheck={false}
           />
         </div>
@@ -158,9 +166,23 @@ export default function Toolbar(): React.JSX.Element {
 
       {(view.kind === 'library' || dirty || selection.length > 0) && (
         <div className="toolbar-row sub">
-          {view.kind === 'library' && (
-            <button className="btn sm" title="Select all filtered fonts, including those off screen" onClick={selectAll}>
-              Select all
+          {source && view.kind === 'library' && <>
+            <button className="btn sm" disabled={Boolean(busy)} onClick={searchSource}>Search {source.name}</button>
+            <button className="btn sm" disabled={Boolean(busy) || !source.hasMore} onClick={() => void refreshProvider(source.id, { query: source.query ?? '', page: (source.page ?? 1) + 1 })}>Load more</button>
+            <span className="muted source-page">{source.count} loaded{source.hasMore ? ' · more load as you scroll' : ' · all results loaded'}{source.query ? ` · Source search: ${source.query}` : ' · Newest fonts'}</span>
+          </>}
+          {view.kind === 'library' && (dirty || selection.length > 0) && (
+            <button
+              className="btn sm"
+              title={selection.length > 0 ? 'Deselect everything' : 'Select all filtered fonts, including those off screen'}
+              onClick={selection.length > 0 ? clearSelection : selectAll}
+            >
+              {selection.length > 0 ? 'Deselect all' : 'Select all'}
+            </button>
+          )}
+          {selection.length > 0 && (
+            <button className="btn sm" title="Select every style of the selected families" onClick={selectFamily}>
+              Select family
             </button>
           )}
           {dirty ? (

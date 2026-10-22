@@ -3,7 +3,7 @@
  * Keep this file dependency-free.
  */
 
-export type ProviderId = 'google' | 'bunny' | 'fontsource' | 'local'
+export type ProviderId = 'google' | 'bunny' | 'fontsource' | 'local' | 'dafont' | '1001fonts'
 
 export type FontFormat = 'ttf' | 'otf' | 'woff' | 'woff2'
 
@@ -75,6 +75,18 @@ export interface FontRecord {
   cached: boolean
   /** Installed into the operating system font store. */
   active: boolean
+  /** Only the record owning an app-created OS installation may remove it. */
+  managedInstall?: boolean
+  installationStatus?: 'known' | 'unknown'
+  installationKey?: string
+  widthClass?: number
+  packageOnly?: boolean
+  packageId?: string
+  packageUrl?: string
+  sourceUrl?: string
+  sourceQuery?: string
+  previewImageUrl?: string
+  licenseText?: string
 
   familyId: string
   version?: string
@@ -155,6 +167,10 @@ export interface FontPair {
 }
 
 export interface ProviderInfo {
+  paged?: boolean
+  page?: number
+  query?: string
+  hasMore?: boolean
   id: ProviderId
   name: string
   /** Catalogue fonts currently indexed for this provider. */
@@ -186,6 +202,7 @@ export interface ScanResult {
 
 export interface ActivationResult {
   changed: string[]
+  skipped: string[]
   failed: { id: string; error: string }[]
 }
 
@@ -232,7 +249,7 @@ export interface FontManagerApi {
   bootstrap(): Promise<Bootstrap>
 
   rescan(): Promise<ScanResult>
-  refreshProvider(id: ProviderId): Promise<ProviderInfo[]>
+  refreshProvider(id: ProviderId, options?: { query?: string; page?: number }): Promise<ProviderInfo[]>
   downloadFont(id: string): Promise<FontRecord>
   downloadMany(ids: string[]): Promise<{ ok: number; failed: number }>
 

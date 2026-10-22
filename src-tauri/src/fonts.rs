@@ -1,5 +1,6 @@
 use crate::storage::{now, Result};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -98,6 +99,7 @@ fn category(face: &Face<'_>, family: &str, subfamily: &str) -> &'static str {
 
 pub fn parse(path: &Path) -> Result<Vec<Value>> {
     let bytes = decode(&read(path)?)?;
+    let hash = format!("{:x}", Sha256::digest(&bytes));
     let count = ttf_parser::fonts_in_collection(&bytes).unwrap_or(1);
     let mut result = Vec::new();
     for index in 0..count {
@@ -134,7 +136,8 @@ pub fn parse(path: &Path) -> Result<Vec<Value>> {
             "weight":face.weight().to_number(),"style":if face.is_italic() || face.is_oblique() || face.italic_angle() != 0.0 {"italic"} else {"normal"},
             "category":category(&face,&family,&subfamily),"axes":axes,
             "format":format(path),"filePath":path,"faceIndex":index,
-            "cached":true,"active":false,"collections":[],"tags":[],"addedAt":now()
+            "cached":true,"active":false,"collections":[],"tags":[],"addedAt":now(),
+            "parsedIdentity":true,"binaryHash":hash,"widthClass":face.width().to_number()
         });
         for (key, id) in [
             ("copyright", 0),

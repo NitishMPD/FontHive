@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "check:rust": "node tools/desktop.cjs cargo check --manifest-path src-tauri/Cargo.toml",
     "test:rust": "node tools/desktop.cjs cargo test --manifest-path src-tauri/Cargo.toml",
+    "check:install": "node tools/install-check.cjs",
     "check:scroll": "node tools/scroll-check.cjs",
     "check:fuzzy": "esbuild tools/fuzzy-check.ts --bundle --platform=node --format=cjs --target=node20 --outfile=tools/fuzzy-check.built.cjs --log-level=error && node tools/fuzzy-check.built.cjs",
     "check:updates": "node tools/release-version.cjs --check && node tools/update-manifest.cjs --check",

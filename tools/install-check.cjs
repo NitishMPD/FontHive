@@ -97,7 +97,33 @@ async function check() {
   assert.equal(stopped, true, 'Checkbox clicks do not also select the card')
   state().clearSelection()
   checkbox.props.onChange()
-  assert.deepEqual(state().selection, ['regular'])
+  assert.deepEqual(state().selection, ['bold', 'regular'], 'Checkbox extends the currently focused face into a selection')
+
+  const external = { ...face('external', 'local:inter', 400, true), managedInstall: false, installationKey: 'same-binary' }
+  const alias = { ...face('alias', 'google:inter', 400, true), managedInstall: false, installationKey: 'same-binary' }
+  const managed = { ...face('managed', 'local:other', 700, true), managedInstall: true, installationKey: 'other-binary' }
+  useApp.setState({ fonts: [external, alias, managed], busy: null })
+  calls = []
+  api.deactivate = async (ids) => { calls.push(ids); return { changed: ids, skipped: [], failed: [] } }
+  await state().toggleActive(external)
+  assert.equal(calls.length, 0, 'An external installation cannot be toggled off')
+  await state().deactivate(['external', 'alias', 'managed'])
+  assert.deepEqual(calls.pop(), ['managed'], 'Batch removal only sends managed owner records')
+  assert.equal(filter.countInstalled([external, alias, managed]), 2, 'Installed totals count aliases once')
+  const staticFace = face('static', 'google:inter')
+  const variableFace = { ...staticFace, id: 'variable', axes: [{ tag: 'wght', min: 100, max: 900 }] }
+  assert.equal(filter.dedupeFaces([staticFace, variableFace]).length, 2, 'Static and variable forms remain distinct')
+  assert.equal(filter.dedupeFaces([{ ...staticFace, packageOnly: true }, { ...staticFace, id: 'other-package', packageOnly: true }]).length, 2, 'Unverified packages are never deduplicated by guessed face metadata')
+  useApp.setState({ fonts: [staticFace], busy: null })
+  outcome = async () => ({ changed: [], skipped: ['static'], failed: [] })
+  await state().activate(['static'])
+  assert.match(state().toasts.at(-1).text, /0 fonts, 1 already installed/, 'Skipped duplicates are not reported as new installations')
+  calls = []
+  api.refreshProvider = async (id, options) => { calls.push({ id, options }); return [] }
+  await state().refreshProvider('dafont', { query: 'script', page: 2 })
+  assert.deepEqual(calls.pop(), { id: 'dafont', options: { query: 'script', page: 2 } }, 'Native source search forwards query and pagination')
+  const remoteMatch = { ...staticFace, family: 'Sand', fullName: 'Sand', postScriptName: 'Sand', sourceQuery: 'sans' }
+  assert.equal(filter.applyFilters([remoteMatch], { ...filter.emptyFilters, query: 'sans' }, []).fonts.length, 1, 'Source search results survive local filtering even when the site expands a query')
   console.log('Family install and multi-select checks passed')
 }
 check().catch((error) => { console.error(error); process.exitCode = 1 })

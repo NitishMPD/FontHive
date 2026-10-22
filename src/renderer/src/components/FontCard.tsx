@@ -34,6 +34,7 @@ function FontCardImpl({ font, width, height, x, y, loadPreview, selected, inSele
   const toggleActive = useApp((s) => s.toggleActive)
   const updateFont = useApp((s) => s.updateFont)
   const busy = useApp((s) => s.busy)
+  const multiSelecting = useApp((s) => s.selection.length > 0)
 
   const [family, setFamily] = useState<string>()
 
@@ -64,14 +65,16 @@ function FontCardImpl({ font, width, height, x, y, loadPreview, selected, inSele
       title={`${font.fullName}\n${font.provider} · ${font.category}${font.filePath ? '' : '\nNot downloaded'}`}
     >
       <div className="font-card-head">
-        <input
-          type="checkbox"
-          checked={inSelection}
-          aria-label={`Select ${font.fullName} (${font.provider})`}
-          onClick={(event) => event.stopPropagation()}
-          onDoubleClick={(event) => event.stopPropagation()}
-          onChange={() => toggleSelect(font.id, true)}
-        />
+        {multiSelecting && (
+          <input
+            type="checkbox"
+            checked={inSelection}
+            aria-label={`Select ${font.fullName} (${font.provider})`}
+            onClick={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
+            onChange={() => toggleSelect(font.id, true)}
+          />
+        )}
         <div className="font-card-title">
           <span className="font-card-family">{font.family}</span>
         </div>
@@ -91,12 +94,12 @@ function FontCardImpl({ font, width, height, x, y, loadPreview, selected, inSele
         </button>
       </div>
 
-      <div className="font-card-preview" style={{ ...fontStyle, fontSize: settings.previewSize }}>
-        {settings.previewText || font.family}
+      <div className="font-card-preview" style={{ ...fontStyle, fontSize: settings.previewSize, height: Math.round(settings.previewSize * 1.25) }}>
+        {font.packageOnly && font.previewImageUrl ? <img className="source-specimen" src={font.previewImageUrl} alt={`${font.family} specimen; download for editable preview`} loading="lazy" referrerPolicy="no-referrer" /> : settings.previewText || font.family}
       </div>
 
       <div className="font-card-alphabet" style={fontStyle}>
-        {ALPHABET}
+        {font.packageOnly ? 'Download to preview your own text and inspect styles.' : ALPHABET}
       </div>
 
       <div className="font-card-foot">
@@ -107,14 +110,16 @@ function FontCardImpl({ font, width, height, x, y, loadPreview, selected, inSele
             </span>
           ))}
           {!font.filePath && <span className="pill cloud">Cloud</span>}
+          {font.active && <span className="pill">Installed</span>}
+          {font.installationStatus === 'unknown' && <span className="pill" title="Rescan to retry installed-font detection">Status unavailable</span>}
         </div>
         <button
           className={`switch ${font.active ? 'on' : ''}`}
           role="switch"
           aria-checked={font.active}
-          aria-label={`${font.active ? 'Deactivate' : 'Install'} ${font.fullName}`}
-          title={font.active ? 'Deactivate' : 'Install'}
-          disabled={Boolean(busy)}
+          aria-label={`${font.active ? font.managedInstall ? 'Deactivate' : 'Already installed' : 'Install'} ${font.fullName}`}
+          title={font.active ? font.managedInstall ? 'Deactivate' : 'Already installed; this record does not own the installation' : font.packageOnly ? 'Install all styles in this font package' : 'Install'}
+          disabled={Boolean(busy) || (font.active && !font.managedInstall)}
           onClick={(event) => {
             event.stopPropagation()
             void toggleActive(font)

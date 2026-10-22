@@ -3,7 +3,10 @@
 mod activation;
 mod backend;
 mod fonts;
+mod imports;
+mod installed;
 mod providers;
+mod sources;
 mod storage;
 mod updates;
 
@@ -28,17 +31,26 @@ struct Runtime {
 #[tauri::command]
 async fn dispatch(
     app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
+    webview: tauri::Webview,
     action: String,
     args: Value,
 ) -> Result<Value, String> {
-    if window.label() != "main" {
+    if webview.label() != "main" {
         return Err("Only the main window may access the library".into());
     }
     if action == "bootstrap" {
         let update = app.state::<updates::Updates>().snapshot();
         let mut result = run_backend(app.clone(), action, args).await?;
         result["appUpdate"] = update;
+        // Scan holds the backend lock; start it only after the UI has its first data.
+        static STARTED: AtomicBool = AtomicBool::new(false);
+        if !STARTED.swap(true, Ordering::SeqCst) {
+            tauri::async_runtime::spawn(async move {
+                if let Err(error) = run_backend(app.clone(), "startup".into(), Value::Null).await {
+                    let _ = app.emit("backend-error", error);
+                }
+            });
+        }
         return Ok(result);
     }
     run_backend(app, action, args).await
@@ -120,13 +132,6 @@ fn main() {
             app.manage(updates::Updates::new(
                 app.package_info().version.to_string(),
             ));
-            let handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                if let Err(error) = run_backend(handle.clone(), "startup".into(), Value::Null).await
-                {
-                    let _ = handle.emit("backend-error", error);
-                }
-            });
             updates::schedule(app.handle().clone());
             Ok(())
         })

@@ -47,6 +47,7 @@ No Electron, Node runtime, Chromium bundle, Fontkit or Koffi ships with the app.
 
 - Windows x64 NSIS, current-user installation with directory selection; preserve
   application data on uninstall. Keep com.nitishmpd.fonthive as the identifier.
+  Set the NSIS installer icon explicitly to the existing resources/icon.ico.
 - Use Nitish as the installer publisher metadata. Keep NitishMPD as the GitHub
   repository owner. Verified Windows signer identity requires an Authenticode
   certificate and cannot be changed by updater signatures or publisher metadata.
@@ -65,7 +66,8 @@ No Electron, Node runtime, Chromium bundle, Fontkit or Koffi ships with the app.
   rather than a local path, public key, shell command or an extra encoding.
 - Tauri updater signatures verify update authenticity. They do not provide
   Windows Authenticode publisher identity or remove SmartScreen warnings.
-  Windows code signing and other platform installers remain separate work.
+  Windows releases remain unsigned for publisher identity and do not require
+  a purchased certificate. Other platform installers remain separate work.
 - Check for stable upgrades after ten seconds and every six hours; never in
   development. Keep user-controlled download, progress, release notes and
   explicit Restart and install. Block new operations during installation;
@@ -95,6 +97,19 @@ No Electron, Node runtime, Chromium bundle, Fontkit or Koffi ships with the app.
   bytes), excluding WebView2. Its updater signature was generated successfully.
   This is one measured build, not a guaranteed size. Check installed footprint, startup, large libraries, previews,
   activation visibility, first-run WebView2 setup and two-version updates.
+
+## Native source catalogues and installed-font detection
+
+- DaFont and 1001 Fonts use the existing native search, grid, selection, details, download and install controls. Do not embed source websites or require an external browser. Other sites are candidates until their catalogue and download flows are verified.
+- These sources load one catalogue page at a time. Search source (or Enter in the search box) searches the selected remote source; Load more indexes the next page. Local filtering continues to search every indexed record. Keep downloaded records and user metadata across catalogue refresh/search.
+- Site catalogue records are font packages with unknown styles. Show the source specimen until download; parse the downloaded package into real faces before showing editable previews, weights or axes. Install on a package installs its included styles; family install includes styles discovered during download. Download alone never installs fonts.
+- Rust owns HTTPS requests, host/redirect validation, time and response limits, ZIP parsing and font validation. Source HTML is parsed as data, never rendered or executed. ZIPs allow at most 256 entries, 32 MiB per entry and 128 MiB expanded output; downloads are limited to 64 MiB. Reject traversal, absolute paths, symlinks and encryption. Ignore executable and unsupported entries; flatten font files into a content-addressed app cache. Preserve bundled text licenses/readmes as inert text with source attribution.
+- Read both HKCU and HKLM registered Windows font paths, including registrations outside standard directories. Parse supported TTF/OTF/TTC/OTC files and track exact decoded-binary/face identity. A watched-folder file or cached download is not installed merely because it exists.
+- `active` means OS installed. `managedInstall` grants removal only to the record owning an app-created installation. Mark verified aliases Installed without transferring ownership; count identical aliases once in installed totals. Unknown inventory status stays visible and blocks blind installation.
+- Refresh inventory on startup, system rescan and before installation; refresh after mutations. Reconcile app ownership after external removal. Preserve provider IDs and existing library data. Catalogue-only names are not verified binary identities: an undownloaded remote entry may need download before its installed match is known.
+- Exact installed duplicates are skipped, with separate installed/skipped/failed results. A different binary with the same PostScript name or an occupied destination is a visible conflict; never replace or adopt it silently. Library mutations remain serialized by the Tauri backend queue.
+- Deactivation is ownership-checked in Rust. Remove-file commands may delete only canonical paths inside Font Hive's cache; protect system, external and watched-folder source files.
+- Verification: TypeScript checks, focused Rust parser/archive/identity checks, renderer install/selection/scroll checks, and an explicit live source/package smoke test. No OS installation, application launch or packaging is performed by these checks. Website HTML can change or block access; report the error and retain indexed fonts.
 
 ## Historical Electron requirements (superseded where specified above)
 
@@ -135,7 +150,6 @@ font data stays in Electron's existing user data directory.
   update and keeps the app running.
 - Keep data anchored to `%APPDATA%/font-hive` across development and packaged
   versions, and allow only one instance to avoid install conflicts.
-<<<<<<< HEAD
 
 ## Font installation and selection
 
@@ -148,9 +162,8 @@ font data stays in Electron's existing user data directory.
 ## Font list performance
 
 - Keep the font grid virtualized with two extra rows on each side of the viewport.
+- Paged sources fetch further catalogue pages automatically near the end of the grid, with a manual Load more fallback. Display loaded counts, not an implied complete catalogue total; stop automatic requests on source errors or an unsubmitted search query.
 - Defer new card preview loading until scrolling stops. Cards keep any preview
   already loaded; new cards use the UI font while scrolling.
 - Keep card layout props stable so unchanged cards skip rendering during scroll.
 
-=======
->>>>>>> 24f9a93d0477c66758cdf77159b711552d2d1bde

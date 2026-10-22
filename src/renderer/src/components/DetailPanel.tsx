@@ -68,7 +68,7 @@ export default function DetailPanel({ font, leaving }: { font: FontRecord; leavi
       </div>
 
       <div className="detail-preview" style={previewStyle}>
-        {settings.previewText || 'The quick brown fox jumps over the lazy dog'}
+        {font.packageOnly && font.previewImageUrl ? <img className="source-specimen" src={font.previewImageUrl} alt={`${font.family} specimen`} referrerPolicy="no-referrer" /> : settings.previewText || 'The quick brown fox jumps over the lazy dog'}
       </div>
 
       <div className="tabs">
@@ -82,46 +82,41 @@ export default function DetailPanel({ font, leaving }: { font: FontRecord; leavi
 
       {tab === 'overview' && (
         <>
-      <div className="detail-section">
-        <div className="row">
-          <button
-            className={`btn ${font.active ? '' : 'primary'}`}
-            style={{ flex: 1 }}
-            disabled={Boolean(busy)}
-            onClick={() => void toggleActive(font)}
-          >
-            <Icon name={font.active ? 'close' : 'check'} size={14} />
-            {font.active ? 'Deactivate' : 'Install'}
-          </button>
-
-          {!font.filePath && (
-            <button className="btn" disabled={Boolean(busy)} onClick={() => void download([font.id])}>
-              <Icon name="download" size={14} />
-            </button>
-          )}
-
-          {font.filePath && (
-            <button className="btn" title="Show file" onClick={() => void window.api.revealFont(font.id)}>
-              <Icon name="folder" size={14} />
-            </button>
-          )}
-        </div>
-
+      <div className="detail-section detail-actions">
         <button
-          className="btn"
-          style={{ width: '100%', marginTop: 8 }}
-          title={`Install all ${familyFonts.length} styles of ${font.family} from ${font.provider}`}
-          disabled={Boolean(busy) || remaining === 0}
-          onClick={() => void installFamily(font.familyId)}
+          className={`btn lg ${font.active ? '' : 'primary'}`}
+          disabled={Boolean(busy) || (font.active && !font.managedInstall)}
+          onClick={() => void toggleActive(font)}
         >
-          <Icon name="check" size={14} />
-          {remaining ? `Install family (${remaining})` : 'Family installed'}
+          <Icon name={font.active ? 'close' : 'check'} size={15} />
+          {font.active ? font.managedInstall ? 'Deactivate' : 'Installed' : 'Install'}
         </button>
 
+        <div className="detail-actions-sub">
+          {!font.filePath && (
+            <button className="btn" disabled={Boolean(busy)} onClick={() => void download([font.id])}>
+              <Icon name="download" size={14} /> Download
+            </button>
+          )}
+          {font.filePath && (
+            <button className="btn" onClick={() => void window.api.revealFont(font.id)}>
+              <Icon name="folder" size={14} /> Show file
+            </button>
+          )}
+          <button
+            className="btn"
+            title={font.packageOnly ? `Download and install every style in ${font.family}` : `Install all ${familyFonts.length} styles of ${font.family} from ${font.provider}`}
+            disabled={Boolean(busy) || remaining === 0}
+            onClick={() => void installFamily(font.familyId)}
+          >
+            <Icon name="check" size={14} />
+            {font.packageOnly ? 'Install family' : remaining ? <>Family <span className="muted">· {remaining}</span></> : 'Family installed'}
+          </button>
+        </div>
+
         {!font.filePath && (
-          <p className="muted" style={{ fontSize: 11.5, margin: '8px 0 0' }}>
-            Catalogue entry. Downloading fetches an installable TrueType file, because Windows cannot
-            install web font formats.
+          <p className="muted" style={{ fontSize: 11.5, margin: '10px 0 0', lineHeight: 1.45 }}>
+            {font.packageOnly ? 'Download to preview your own text and inspect the included styles. Install imports and installs every style in the package. Check the license before use.' : 'Catalogue entry. Download fetches an installable font file.'}
           </p>
         )}
       </div>
@@ -162,13 +157,13 @@ export default function DetailPanel({ font, leaving }: { font: FontRecord; leavi
           <dt>Provider</dt>
           <dd>{font.provider}</dd>
           <dt>Weight</dt>
-          <dd>{font.weight}</dd>
+          <dd>{font.packageOnly ? 'Available after download' : font.weight}</dd>
           <dt>Style</dt>
-          <dd>{font.style}</dd>
+          <dd>{font.packageOnly ? 'Available after download' : font.style}</dd>
           <dt>Format</dt>
-          <dd>{font.format.toUpperCase()}</dd>
+          <dd>{font.packageOnly ? 'ZIP package' : font.format.toUpperCase()}</dd>
           <dt>PostScript</dt>
-          <dd title={font.postScriptName}>{font.postScriptName}</dd>
+          <dd title={font.postScriptName}>{font.packageOnly ? 'Available after download' : font.postScriptName}</dd>
           {font.designer && (
             <>
               <dt>Designer</dt>
@@ -182,8 +177,10 @@ export default function DetailPanel({ font, leaving }: { font: FontRecord; leavi
             </>
           )}
           <dt>Status</dt>
-          <dd>{font.active ? 'Installed' : font.filePath ? 'Downloaded' : 'Catalogue only'}</dd>
+          <dd>{font.installationStatus === 'unknown' ? 'Installation status unavailable' : font.active ? font.managedInstall ? 'Installed by Font Hive' : 'Already installed on this PC' : font.filePath ? 'Downloaded' : 'Catalogue only'}</dd>
         </dl>
+        {font.sourceUrl && <p className="muted source-attribution">Source: {font.sourceUrl}</p>}
+        {font.licenseText && <details className="source-license"><summary>Bundled license and readme</summary><pre>{font.licenseText}</pre></details>}
       </div>
 
         </>
@@ -193,29 +190,26 @@ export default function DetailPanel({ font, leaving }: { font: FontRecord; leavi
         <>
       <div className="detail-section">
         <h3>Rating</h3>
-        <div className="row">
+        <div className="rating">
           {[1, 2, 3, 4, 5].map((value) => (
             <button
               key={value}
-              className="icon-btn"
-              style={{ color: (font.rating ?? 0) >= value ? 'var(--warn)' : 'var(--text-faint)' }}
-              onClick={() =>
-                void updateFont(font.id, { rating: font.rating === value ? 0 : value })
-              }
-              title={`${value} star${value > 1 ? 's' : ''}`}
+              className={`rating-star ${(font.rating ?? 0) >= value ? 'on' : ''}`}
+              aria-label={`${value} star${value > 1 ? 's' : ''}`}
+              title={font.rating === value ? 'Clear rating' : `${value} star${value > 1 ? 's' : ''}`}
+              onClick={() => void updateFont(font.id, { rating: font.rating === value ? 0 : value })}
             >
-              <Icon name="star" size={15} />
+              <Icon name="star" size={18} filled={(font.rating ?? 0) >= value} />
             </button>
           ))}
+          <span className="muted rating-label">{font.rating ? `${font.rating} / 5` : 'Not rated'}</span>
         </div>
       </div>
 
       <div className="detail-section">
         <h3>Collections</h3>
         {collections.length === 0 ? (
-          <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-            Create a collection from the sidebar to group fonts.
-          </p>
+          <p className="empty-hint">Create a collection from the sidebar to group fonts.</p>
         ) : (
           <div className="chip-row">
             {collections.map((collection) => (
@@ -249,8 +243,8 @@ export default function DetailPanel({ font, leaving }: { font: FontRecord; leavi
           ))}
           <input
             className="text-input"
-            style={{ width: 120, padding: '4px 8px' }}
-            placeholder="Add tag…"
+            style={{ flex: 1, minWidth: 90, padding: '4px 8px' }}
+            placeholder={font.tags.length ? 'Add tag…' : 'Add a tag and press Enter'}
             value={tagDraft}
             onChange={(event) => setTagDraft(event.target.value)}
             onKeyDown={(event) => {

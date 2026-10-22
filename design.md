@@ -14,6 +14,9 @@ Author: Nitish
   controls to check, download with progress, view notes, and restart to install.
 ## Visual language and interaction
 
+Use the existing Font Hive icon (`resources/icon.ico`) for the Windows setup
+executable so downloaded installers match the app's branding.
+
 Preserve the existing restrained desktop interface: dark and light neutral
 palettes, compact controls, sidebar navigation, library grid, detail panel and
 monochrome branding. Keep the current React components, typography, spacing,
@@ -38,3 +41,11 @@ keyboard shortcuts, filters, variable-axis sliders and motion.
 - Preserve keyboard support and existing accessibility. WebView2 must retain
   preview fidelity and variable-axis behavior; test native window interactions
   and font rendering in the packaged application.
+
+## Consistent source UX
+
+- Every source uses Font Hive's existing toolbar, virtualized font cards, detail panel, selection, Download, Install and Install family actions. Do not embed a website or open discovery links in an external browser.
+- For paged sources, automatically fetch the next page near the end of the grid. Keep compact Search source and Load more controls for keyboard access and retry. Enter searches the selected source. Show the loaded count and whether more results remain, without treating a page count as the source total.
+- Keep package previews in the usual card/detail preview area. Until downloaded, label the entry Font package and explain that Download enables custom preview text and reveals styles. Blend monochrome source specimens into the preview surface: light lettering in dark mode and dark lettering in light mode, without a white image strip.
+- Cards visibly mark Installed. Details distinguish Installed by Font Hive, Already installed on this PC and Installation status unavailable. Disable removal for external fonts and non-owning aliases while preserving keyboard selection.
+- Render source URLs as attribution text and bundled license/readme text in an expandable, scrollable Details section. Keep all errors and partial install feedback in the existing provider/toast patterns.

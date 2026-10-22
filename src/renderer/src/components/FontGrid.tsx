@@ -20,8 +20,10 @@ export default function FontGrid(): React.JSX.Element {
   const providers = useApp((s) => s.providers)
   const setFilters = useApp((s) => s.setFilters)
   const view = useApp((s) => s.view)
+  const busy = useApp((s) => s.busy)
 
   const scrollRef = useRef<HTMLDivElement>(null)
+  const requestedPage = useRef('')
   const [width, setWidth] = useState(0)
 
   useEffect(() => {
@@ -68,6 +70,26 @@ export default function FontGrid(): React.JSX.Element {
   }, [rowHeight, cardWidth, virtualizer])
 
   const selectedSet = useMemo(() => new Set(selection), [selection])
+
+  const source = filters.providers.length === 1
+    ? providers.find((p) => p.id === filters.providers[0] && p.paged)
+    : undefined
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || !source?.hasMore || source.error || busy || view.kind !== 'library' || !visible.length ||
+      filters.query.trim() !== (source.query ?? '')) return
+    const loadNextPage = (): void => {
+      if (el.scrollHeight - el.scrollTop - el.clientHeight > rowHeight * 2) return
+      const page = (source.page ?? 1) + 1
+      const key = JSON.stringify([source.id, source.query ?? '', page])
+      if (requestedPage.current === key) return
+      requestedPage.current = key
+      void refreshProvider(source.id, { query: source.query ?? '', page })
+    }
+    el.addEventListener('scroll', loadNextPage, { passive: true })
+    loadNextPage()
+    return () => el.removeEventListener('scroll', loadNextPage)
+  }, [source, busy, view.kind, visible.length, filters.query, rowHeight, refreshProvider])
 
   if (visible.length === 0) {
     const isCollection = view.kind === 'collection'

@@ -46,10 +46,10 @@ impl Updates {
 #[tauri::command]
 pub async fn update_action(
     app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
+    webview: tauri::Webview,
     action: String,
 ) -> Result<()> {
-    if window.label() != "main" {
+    if webview.label() != "main" {
         return Err("Only the main window may update the app".into());
     }
     perform(&app, &action).await

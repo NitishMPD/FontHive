@@ -1,5 +1,5 @@
 use crate::{
-    activation, fonts, providers,
+    activation, fonts, imports, installed, providers, sources,
     storage::{self, now, text, Result},
     PreviewIndex,
 };
@@ -19,6 +19,7 @@ pub struct Backend {
     activated: Value,
     client: reqwest::blocking::Client,
     provider_errors: HashMap<String, String>,
+    installed: installed::Inventory,
 }
 
 #[cfg(test)]
@@ -42,6 +43,64 @@ mod tests {
         }
         assert_eq!(incoming["weight"], 700);
         assert_eq!(incoming["axes"][0]["tag"], "wght");
+    }
+
+    #[test]
+    #[ignore = "Live package download into a temporary cache; no OS installation"]
+    fn live_package_download_preserves_ids_metadata_and_redownloads() {
+        let root = std::env::temp_dir().join(format!(
+            "font-hive-library-check-{}-{}",
+            std::process::id(),
+            now()
+        ));
+        fs::create_dir(&root).unwrap();
+        let result = std::panic::catch_unwind(|| {
+            let (mut catalog, _) = sources::catalog("1001fonts", "", 1).unwrap();
+            let mut package = catalog.remove(0);
+            package["favorite"] = json!(true);
+            package["note"] = json!("Keep the selection and notes");
+            let id = text(&package, "id").to_string();
+            let family_id = package["familyId"].clone();
+            let mut backend = Backend {
+                root: root.clone(),
+                library: json!({"fonts":[package]}),
+                activated: json!({}),
+                client: providers::client().unwrap(),
+                provider_errors: HashMap::new(),
+                installed: installed::Inventory::default(),
+            };
+            let downloaded = backend.download(&id).unwrap();
+            assert_eq!(downloaded["id"], id);
+            assert_eq!(downloaded["familyId"], family_id);
+            assert_eq!(downloaded["favorite"], true);
+            assert_eq!(downloaded["note"], "Keep the selection and notes");
+            assert!(backend.library["fonts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|f| f["packageId"] == id
+                    && f["parsedIdentity"] == true
+                    && f["active"] == false));
+            let faces = array(&backend.library, "fonts");
+            for face in faces {
+                let path = PathBuf::from(text(&face, "filePath"));
+                assert!(path
+                    .canonicalize()
+                    .unwrap()
+                    .starts_with(root.canonicalize().unwrap()));
+                fs::remove_file(path).unwrap();
+                let restored = backend.download(text(&face, "id")).unwrap();
+                assert_eq!(restored["id"], face["id"]);
+                assert_eq!(restored["postScriptName"], face["postScriptName"]);
+                assert!(Path::new(text(&restored, "filePath")).is_file());
+            }
+        });
+        let absolute = root.canonicalize().unwrap();
+        assert!(absolute.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        fs::remove_dir_all(absolute).unwrap();
+        if let Err(error) = result {
+            std::panic::resume_unwind(error);
+        }
     }
 }
 
@@ -99,7 +158,9 @@ impl Backend {
             activated,
             client: providers::client()?,
             provider_errors: HashMap::new(),
+            installed: installed::Inventory::default(),
         };
+        let _ = backend.installed.refresh();
         backend.reconcile();
         Ok(backend)
     }
@@ -126,8 +187,45 @@ impl Backend {
 
     fn reconcile(&mut self) {
         for font in self.library["fonts"].as_array_mut().unwrap() {
-            font["active"] = json!(self.activated[text(font, "id")].is_string());
+            let managed = self.activated[text(font, "id")].is_string();
+            let matching = self.installed.matching(font).or_else(|| {
+                self.installed.faces.iter().find(|f| {
+                    let path = if managed {
+                        self.activated[text(font, "id")].as_str()
+                    } else {
+                        font["filePath"].as_str()
+                    };
+                    path.zip(f["filePath"].as_str()).is_some_and(|(a, b)| {
+                        installed::path_key(Path::new(a)) == installed::path_key(Path::new(b))
+                    }) && font["faceIndex"].as_u64().unwrap_or(0)
+                        == f["faceIndex"].as_u64().unwrap_or(0)
+                })
+            });
+            font["active"] =
+                json!(managed || (self.installed.error.is_none() && matching.is_some()));
+            font["managedInstall"] = json!(managed);
+            font["installationKey"] = matching
+                .map(|f| {
+                    json!(format!(
+                        "{}:{}:{}",
+                        text(f, "binaryHash"),
+                        text(f, "postScriptName"),
+                        f["faceIndex"]
+                    ))
+                })
+                .unwrap_or_else(|| json!(text(font, "id")));
+            font["installationStatus"] = json!(if self.installed.error.is_none() {
+                "known"
+            } else {
+                "unknown"
+            });
         }
+    }
+
+    fn refresh_installed(&mut self) -> Result<()> {
+        activation::reconcile(&mut self.activated)?;
+        storage::write_json(&self.root.join("activated.json"), &self.activated)?;
+        self.installed.refresh()
     }
 
     fn emit(&self, app: &tauri::AppHandle, previews: &PreviewIndex) {
@@ -153,16 +251,26 @@ impl Backend {
             ("google","Google Fonts","Fonts served by Google Fonts (fonts.google.com)","https://fonts.google.com"),
             ("bunny","Bunny Fonts","Bunny Fonts is a privacy-focused mirror of the Google Fonts library","https://fonts.bunny.net"),
             ("fontsource","Fontsource","Open-source fonts packaged by Fontsource and served via jsDelivr","https://fontsource.org"),
-            ("local","Local & network folders","Your own folders and system fonts","")
+            ("local","Local & network folders","Your own folders and system fonts",""),
+            ("dafont","DaFont","Font packages from DaFont. License permissions vary by font.","https://www.dafont.com"),
+            ("1001fonts","1001 Fonts","Font packages from 1001 Fonts. Check each bundled license.","https://www.1001fonts.com")
         ].into_iter().map(|(id,name,attribution,homepage)| {
             let count = self.library["fonts"].as_array().unwrap().iter().filter(|f| f["provider"] == id).count();
             json!({"id":id,"name":name,"count":count,"remote":id!="local",
                 "status":if self.provider_errors.contains_key(id) {"error"} else if count>0 || id=="local" {"ready"} else {"idle"},
-                "error":self.provider_errors.get(id),"attribution":attribution,"homepage":homepage})
+                "error":self.provider_errors.get(id),"attribution":attribution,"homepage":homepage,
+                "paged":sources::is_site(id),"page":self.library["providerMeta"][id]["page"],
+                "query":self.library["providerMeta"][id]["query"],"hasMore":self.library["providerMeta"][id]["hasMore"]})
         }).collect::<Vec<_>>())
     }
 
     fn scan(&mut self, app: &tauri::AppHandle, include_system: bool) -> Result<Value> {
+        if include_system {
+            if let Err(error) = self.refresh_installed() {
+                self.installed.error = Some(error.clone());
+                let _ = app.emit("backend-error", error);
+            }
+        }
         let start = now();
         let mut errors = Vec::new();
         let mut roots = Vec::new();
@@ -268,11 +376,51 @@ impl Backend {
         )
     }
 
-    fn refresh(&mut self, app: &tauri::AppHandle, id: &str) -> Result<Value> {
+    fn refresh(
+        &mut self,
+        app: &tauri::AppHandle,
+        id: &str,
+        query: &str,
+        page: u32,
+    ) -> Result<Value> {
         if id == "local" {
             return Ok(self.provider_infos());
         }
         Self::progress(app, "catalog", 0, 1, format!("Fetching {id} catalogue"));
+        if sources::is_site(id) {
+            match sources::catalog(id, query, page) {
+                Ok((incoming, more)) => {
+                    let fonts = self.library["fonts"].as_array_mut().unwrap();
+                    for mut font in incoming {
+                        font["sourceQuery"] = json!(query);
+                        let package_id = text(&font, "id").to_string();
+                        if fonts
+                            .iter()
+                            .any(|f| f["packageId"] == package_id && f["filePath"].is_string())
+                        {
+                            for face in fonts.iter_mut().filter(|f| f["packageId"] == package_id) {
+                                face["sourceQuery"] = json!(query);
+                            }
+                            continue;
+                        }
+                        if let Some(existing) = fonts.iter_mut().find(|f| f["id"] == package_id) {
+                            preserve(&mut font, existing);
+                            *existing = font;
+                        } else {
+                            fonts.push(font);
+                        }
+                    }
+                    self.library["providerMeta"][id] =
+                        json!({"lastRefresh":now(),"page":page,"query":query,"hasMore":more});
+                    self.provider_errors.remove(id);
+                    self.reconcile();
+                }
+                Err(error) => {
+                    self.provider_errors.insert(id.into(), error);
+                }
+            }
+            return Ok(self.provider_infos());
+        }
         match providers::catalog(&self.client, id) {
             Ok(mut incoming) => {
                 let previous: HashMap<String, Value> = array(&self.library, "fonts")
@@ -321,6 +469,7 @@ impl Backend {
             }
         }
         Self::progress(app, "catalog", 1, 1, format!("Finished {id} catalogue"));
+        self.reconcile();
         Ok(self.provider_infos())
     }
 
@@ -332,11 +481,60 @@ impl Backend {
             .position(|f| f["id"] == id)
             .ok_or("Font not found")?;
         let mut font = self.library["fonts"][index].clone();
+        if sources::is_site(text(&font, "provider"))
+            && !font["filePath"]
+                .as_str()
+                .is_some_and(|p| Path::new(p).is_file())
+        {
+            let package_id = font["packageId"].as_str().unwrap_or(id).to_string();
+            let mut package = font.clone();
+            package["id"] = json!(package_id);
+            let mut incoming = imports::package(&self.root, &package)?;
+            incoming[0]["id"] = json!(package_id);
+            let fonts = self.library["fonts"].as_array_mut().unwrap();
+            for mut face in incoming {
+                if let Some(previous) = fonts.iter_mut().find(|f| f["id"] == face["id"]) {
+                    preserve(&mut face, previous);
+                    *previous = face;
+                } else {
+                    fonts.push(face);
+                }
+            }
+            self.reconcile();
+            if !self.library["fonts"][index]["filePath"]
+                .as_str()
+                .is_some_and(|p| Path::new(p).is_file())
+            {
+                return Err("The source package changed and no longer contains this face. Browse its updated family instead.".into());
+            }
+            return Ok(self.library["fonts"][index].clone());
+        }
         if font["provider"] == "local"
             || font["filePath"]
                 .as_str()
                 .is_some_and(|p| Path::new(p).exists())
         {
+            {
+                if let Some(path) = font["filePath"].as_str() {
+                    let parsed = fonts::parse(Path::new(path))?;
+                    if let Some(face) = parsed.iter().find(|f| {
+                        f["faceIndex"].as_u64().unwrap_or(0)
+                            == font["faceIndex"].as_u64().unwrap_or(0)
+                    }) {
+                        if !text(face, "postScriptName")
+                            .eq_ignore_ascii_case(text(&font, "postScriptName"))
+                        {
+                            return Err(
+                                "Font file identity changed; rescan before installing it".into()
+                            );
+                        }
+                        for key in ["binaryHash", "parsedIdentity", "faceIndex", "widthClass"] {
+                            font[key] = face[key].clone();
+                        }
+                        self.library["fonts"][index] = font.clone();
+                    }
+                }
+            }
             return Ok(font);
         }
         let url = providers::resolve(&self.client, &font)?;
@@ -400,6 +598,9 @@ impl Backend {
             "license",
             "designer",
             "copyright",
+            "binaryHash",
+            "parsedIdentity",
+            "widthClass",
         ] {
             if let Some(v) = parsed.get(key) {
                 font[key] = v.clone();
@@ -415,50 +616,116 @@ impl Backend {
         font["cached"] = json!(true);
         font["downloadUrl"] = json!(url);
         self.library["fonts"][index] = font.clone();
-        Ok(font)
+        self.reconcile();
+        Ok(self.library["fonts"][index].clone())
     }
 
     fn activation(&mut self, app: &tauri::AppHandle, selected: &[String], active: bool) -> Value {
         let mut changed = Vec::new();
+        let mut skipped = Vec::new();
         let mut failed = Vec::new();
-        for (done, id) in selected.iter().enumerate() {
+        if let Err(error) = self.refresh_installed() {
+            self.installed.error = Some(error.clone());
+            self.reconcile();
+            return json!({"changed":[],"skipped":[],"failed":selected.iter().map(|id|json!({"id":id,"error":error})).collect::<Vec<_>>()});
+        }
+        self.reconcile();
+        let mut pending = selected.to_vec();
+        let mut seen = HashSet::new();
+        let mut done = 0;
+        while done < pending.len() {
+            let id = pending[done].clone();
+            done += 1;
+            if !seen.insert(id.clone()) {
+                continue;
+            }
+            let mut did_change = false;
             let result = (|| -> Result<()> {
+                let current = self.library["fonts"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|f| f["id"] == id)
+                    .ok_or("Font not found")?;
+                if active && current["active"] == true {
+                    return Ok(());
+                }
                 let font = if active {
-                    self.download(id)?
+                    let was_package = self.library["fonts"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .any(|f| f["id"] == id && f["packageOnly"] == true);
+                    let font = self.download(&id)?;
+                    if was_package {
+                        pending.extend(
+                            self.library["fonts"]
+                                .as_array()
+                                .unwrap()
+                                .iter()
+                                .filter(|f| f["packageId"] == id && f["id"] != id)
+                                .map(|f| text(f, "id").to_string()),
+                        );
+                    }
+                    font
                 } else {
                     self.library["fonts"]
                         .as_array()
                         .unwrap()
                         .iter()
-                        .find(|f| f["id"] == *id)
+                        .find(|f| f["id"] == id)
                         .cloned()
                         .ok_or("Font not found")?
                 };
                 if active {
-                    activation::activate(&self.root, &mut self.activated, &font)
+                    if self.installed.matching(&font).is_some() || self.activated[&id].is_string() {
+                        return Ok(());
+                    }
+                    if self.installed.conflict(&font) {
+                        return Err("A different version or binary with this PostScript name is already installed; it was not replaced".into());
+                    }
+                    activation::activate(&self.root, &mut self.activated, &font)?;
+                    self.installed.refresh()?;
+                    did_change = true;
+                    Ok(())
                 } else {
-                    activation::deactivate(&self.root, &mut self.activated, &font)
+                    if !self.activated[&id].is_string() {
+                        if font["active"] == true {
+                            return Err("This installation is not managed by Font Hive".into());
+                        }
+                        return Ok(());
+                    }
+                    activation::deactivate(&self.root, &mut self.activated, &font)?;
+                    self.installed.refresh()?;
+                    did_change = true;
+                    Ok(())
                 }
             })();
             match result {
-                Ok(()) => changed.push(id.clone()),
+                Ok(()) => {
+                    if did_change {
+                        changed.push(id.clone())
+                    } else {
+                        skipped.push(id.clone())
+                    }
+                }
                 Err(error) => failed.push(json!({"id":id,"error":error})),
             }
             Self::progress(
                 app,
                 if active { "activate" } else { "deactivate" },
-                done + 1,
-                selected.len(),
+                done,
+                pending.len(),
                 format!(
                     "{} {} / {}",
                     if active { "Activating" } else { "Deactivating" },
-                    done + 1,
-                    selected.len()
+                    done,
+                    pending.len()
                 ),
             );
         }
         self.reconcile();
-        json!({"changed":changed,"failed":failed})
+        json!({"changed":changed,"skipped":skipped,"failed":failed})
     }
 
     pub fn dispatch(
@@ -501,6 +768,9 @@ impl Backend {
         match action {
             "bootstrap" => {
                 self.reconcile();
+                if let Some(error) = &self.installed.error {
+                    let _ = app.emit("backend-error", error);
+                }
                 Ok(
                     json!({"fonts":self.library["fonts"],"collections":self.library["collections"],"pairs":self.library["pairs"],"folders":self.library["folders"],"settings":self.library["settings"],"providers":self.provider_infos(),"platform":"win32"}),
                 )
@@ -525,7 +795,16 @@ impl Backend {
                 }
             }
             "rescan" => self.scan(app, true),
-            "refresh-provider" => self.refresh(app, argument(&args, "id")?),
+            "refresh-provider" => self.refresh(
+                app,
+                argument(&args, "id")?,
+                args["query"].as_str().unwrap_or(""),
+                args["page"]
+                    .as_u64()
+                    .unwrap_or(1)
+                    .try_into()
+                    .map_err(|_| "Invalid page")?,
+            ),
             "download-font" => self.download(argument(&args, "id")?),
             "download-many" => {
                 let selected = ids(&args)?;
@@ -700,6 +979,14 @@ impl Backend {
                     .position(|f| f["id"] == args["id"])
                     .ok_or("Font not found")?;
                 let mut font = self.library["fonts"][index].clone();
+                if let Some(path) = font["filePath"].as_str() {
+                    let path = fs::canonicalize(path).map_err(|e| e.to_string())?;
+                    let cache = fs::canonicalize(self.root.join("font-cache"))
+                        .map_err(|e| e.to_string())?;
+                    if !storage::under(&path, &cache) {
+                        return Err("Only Font Hive cache files can be removed; external and watched-folder fonts are protected".into());
+                    }
+                }
                 activation::deactivate(&self.root, &mut self.activated, &font)?;
                 if let Some(path) = font["filePath"].as_str() {
                     // Every face in a collection references the same physical file.
@@ -730,7 +1017,9 @@ impl Backend {
                 font["cached"] = json!(false);
                 font["active"] = json!(false);
                 self.library["fonts"][index] = font.clone();
-                Ok(font)
+                let _ = self.installed.refresh();
+                self.reconcile();
+                Ok(self.library["fonts"][index].clone())
             }
             _ => Err(format!("Unknown action: {action}")),
         }

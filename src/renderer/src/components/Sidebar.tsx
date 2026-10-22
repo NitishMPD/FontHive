@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
 import { useApp } from '../store'
-import { dedupeFaces } from '../lib/filter'
+import { countInstalled, dedupeFaces } from '../lib/filter'
 import Icon from './Icon'
 import type { ProviderId } from '@shared/types'
 
-const PROVIDER_ORDER: ProviderId[] = ['local', 'google', 'fontsource', 'bunny']
+const PROVIDER_ORDER: ProviderId[] = ['local', 'google', 'fontsource', 'bunny', 'dafont', '1001fonts']
 
 export default function Sidebar(): React.JSX.Element {
   const fonts = useApp((s) => s.fonts)
@@ -18,7 +18,7 @@ export default function Sidebar(): React.JSX.Element {
   const rescan = useApp((s) => s.rescan)
   const busy = useApp((s) => s.busy)
 
-  const activeCount = useMemo(() => fonts.filter((f) => f.active).length, [fonts])
+  const activeCount = useMemo(() => countInstalled(fonts), [fonts])
   const favoriteCount = useMemo(() => fonts.filter((f) => f.favorite).length, [fonts])
   // "Browse Fonts" must equal what the grid actually shows. With grouping on,
   // that is the de-duplicated set, not the raw record count.
@@ -59,7 +59,7 @@ export default function Sidebar(): React.JSX.Element {
           onClick={() => browseLibrary({ onlyActive: true })}
         >
           <Icon name="check" />
-          <span className="label">Active</span>
+          <span className="label">Installed</span>
           <span className="count">{activeCount}</span>
         </button>
 

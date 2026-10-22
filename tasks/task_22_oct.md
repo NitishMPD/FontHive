@@ -1,1 +1,13 @@
 - Added provider-scoped family install, accessible card multi-selection, filtered Select all, and batch Install selected; reused activation with installed-font skipping and request protection. Updated project/design docs and passed type-check, install/selection checks, and scroll checks.
+- Resolved Electron-to-Tauri merge conflicts while preserving Tauri and the existing installation/selection flow.
+- Added native DaFont and 1001 Fonts catalogues, search, pagination and safe ZIP import within the existing Font Hive grid and details UX.
+- Added verified installed-font badges, duplicate skipping and ownership protection; passed type-check, focused frontend/Rust checks, live source imports/redownloads and read-only inventory checks for 535 Windows faces. Updated project/design docs and implementation plan.
+- Added required Windows Authenticode signing to release CI, certificate cleanup and app/installer signature verification; documented PFX secrets and provider limits. Signing guard checks and diff checks passed; real signing awaits a trusted certificate and user-run release.
+- Font card selection boxes now show only during Ctrl/Shift multi-select; plain click just opens details.
+- Set the Windows NSIS setup executable to use Font Hive's existing icon; checked the supported config field, asset path and ICO header without building.
+- Removed Windows certificate signing and its CI secrets requirement at user request; kept the installer icon and Tauri updater signing. Release version and updater manifest checks passed.
+- Softer themed font card selection: tinted background, thin ring, custom checkbox.
+- Toolbar: Select all only while filtering, toggles to Deselect all; added Select family when a font is selected.
+- Detail panel actions: large Install button with Download / Family row below.
+- Organize tab: filled star rating with label, dashed empty collections hint, framed tag input.
+- Fixed paged source browsing to automatically load near the grid end, clarify loaded counts, and blend source specimens into both themes. Type-check, pagination/scroll and install/selection checks passed; updated existing test fixtures for current selection behavior.

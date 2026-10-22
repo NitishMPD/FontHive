@@ -1,4 +1,5 @@
 import { useApp } from '../store'
+import { countInstalled } from '../lib/filter'
 import Icon from './Icon'
 import AppUpdates from './AppUpdates'
 
@@ -9,7 +10,7 @@ export default function SettingsView(): React.JSX.Element {
   const platform = useApp((s) => s.platform)
 
   const downloaded = fonts.filter((f) => f.filePath).length
-  const active = fonts.filter((f) => f.active).length
+  const active = countInstalled(fonts)
 
   return (
     <div className="panel">
@@ -89,7 +90,7 @@ export default function SettingsView(): React.JSX.Element {
         <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
           <span className="badge">{fonts.length.toLocaleString()} faces indexed</span>
           <span className="badge">{downloaded.toLocaleString()} files on disk</span>
-          <span className="badge active">{active.toLocaleString()} active</span>
+          <span className="badge active">{active.toLocaleString()} installed</span>
           <span className="badge axes">
             {fonts.filter((f) => f.axes.length > 0).length.toLocaleString()} variable
           </span>

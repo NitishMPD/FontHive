@@ -95,8 +95,9 @@ export function collectionMembers(fonts: FontRecord[], collection: Collection): 
 /** Search matches the family, subfamily and face name, case-insensitively. */
 function matchesQuery(font: FontRecord, query: string): boolean {
   if (!query) return true
+  if (font.sourceQuery && font.sourceQuery.toLowerCase() === query.trim().toLowerCase()) return true
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean)
-  const haystack = `${font.family} ${font.subfamily} ${font.fullName} ${font.postScriptName} ${font.tags.join(' ')}`.toLowerCase()
+  const haystack = `${font.family} ${font.subfamily} ${font.fullName} ${font.postScriptName} ${font.designer ?? ''} ${font.tags.join(' ')}`.toLowerCase()
   return terms.every((term) => haystack.includes(term))
 }
 
@@ -223,11 +224,16 @@ export function dedupeFaces(fonts: FontRecord[]): FontRecord[] {
     (f.active ? 100 : 0) + (f.favorite ? 60 : 0) + (f.filePath ? 50 : 0) + (PROVIDER_RANK[f.provider] ?? 0)
   const best = new Map<string, FontRecord>()
   for (const font of fonts) {
-    const key = `${font.family.trim().toLowerCase()}|${font.weight}|${font.style}`
+    const axes = font.axes.map((axis) => `${axis.tag}:${axis.min}:${axis.max}`).sort().join(',')
+    const key = font.packageOnly ? font.id : `${font.family.trim().toLowerCase()}|${font.weight}|${font.style}|${font.widthClass ?? 5}|${axes}`
     const current = best.get(key)
     if (!current || score(font) > score(current)) best.set(key, font)
   }
   return [...best.values()]
+}
+
+export function countInstalled(fonts: FontRecord[]): number {
+  return new Set(fonts.filter((font) => font.active).map((font) => font.installationKey ?? font.id)).size
 }
 
 function computeFilters(

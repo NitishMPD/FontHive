@@ -27,7 +27,7 @@ export default function ProvidersView(): React.JSX.Element {
       <h2>Catalogue sources</h2>
       <p className="sub">
         Providers supply font catalogues you can preview instantly and download as installable files.
-        Local folders are managed separately.
+        DaFont and 1001 Fonts use the same library controls, with paged search and package downloads. Local folders are managed separately.
       </p>
 
       {providers.map((provider) => {
@@ -81,21 +81,7 @@ export default function ProvidersView(): React.JSX.Element {
 
             <p className="muted" style={{ fontSize: 12, margin: 0 }}>
               {provider.attribution}
-              {provider.homepage && (
-                <>
-                  {' · '}
-                  <a
-                    href={provider.homepage}
-                    onClick={(event) => {
-                      event.preventDefault()
-                      void window.api.openExternal(provider.homepage!)
-                    }}
-                    style={{ color: 'var(--accent)' }}
-                  >
-                    visit
-                  </a>
-                </>
-              )}
+              {provider.paged && ' Download a package to edit its preview and see its included styles.'}
             </p>
           </div>
         )

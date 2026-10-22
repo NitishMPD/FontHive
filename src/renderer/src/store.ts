@@ -58,6 +58,7 @@ interface AppState {
   toggleSelect: (id: string, additive: boolean) => void
   clearSelection: () => void
   selectAll: () => void
+  selectFamily: () => void
 
   setAxis: (fontId: string, tag: string, value: number) => void
   resetAxes: (fontId: string) => void
@@ -68,7 +69,7 @@ interface AppState {
   toggleActive: (font: FontRecord) => Promise<void>
 
   rescan: () => Promise<void>
-  refreshProvider: (id: ProviderId) => Promise<void>
+  refreshProvider: (id: ProviderId, options?: { query?: string; page?: number }) => Promise<void>
   download: (ids: string[]) => Promise<void>
 
   saveCollection: (collection: Collection) => Promise<void>
@@ -175,16 +176,24 @@ export const useApp = create<AppState>((set, get) => ({
   select: (id) => set({ selectedId: id }),
 
   toggleSelect: (id, additive) => {
-    const current = get().selection
+    const { selection, selectedId } = get()
+    // Plain click only opens the detail panel; checkboxes appear once a multi-select starts.
     if (!additive) {
-      set({ selection: current.length === 1 && current[0] === id ? [] : [id], selectedId: id })
+      set({ selection: [], selectedId: id })
       return
     }
+    const current = selection.length === 0 && selectedId ? [selectedId] : selection
     const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
     set({ selection: next, selectedId: next[next.length - 1] ?? null })
   },
 
   clearSelection: () => set({ selection: [] }),
+
+  selectFamily: () => {
+    const { fonts, selection } = get()
+    const families = new Set(fonts.filter((f) => selection.includes(f.id)).map((f) => f.family))
+    set({ selection: fonts.filter((f) => families.has(f.family)).map((f) => f.id) })
+  },
 
   selectAll: () => {
     const { fonts, filters, collections } = get()
@@ -217,7 +226,8 @@ export const useApp = create<AppState>((set, get) => ({
           'error'
         )
       } else {
-        get().toast(`Installed ${result.changed.length} font${result.changed.length === 1 ? '' : 's'}`, 'success')
+        const skipped = result.skipped?.length ?? 0
+        get().toast(`Installed ${result.changed.length} font${result.changed.length === 1 ? '' : 's'}${skipped ? `, ${skipped} already installed` : ''}`, 'success')
       }
     } catch (err) {
       get().toast((err as Error).message, 'error')
@@ -232,10 +242,13 @@ export const useApp = create<AppState>((set, get) => ({
 
   async deactivate(ids) {
     if (get().busy) return
+    const requested = new Set(ids)
+    ids = get().fonts.filter((font) => requested.has(font.id) && font.managedInstall).map((font) => font.id)
     if (!ids.length) return
     set({ busy: `Deactivating ${ids.length}…` })
     try {
-      await window.api.deactivate(ids)
+      const result = await window.api.deactivate(ids)
+      if (result.failed.length) get().toast(result.failed[0].error, 'error')
     } catch (err) {
       get().toast((err as Error).message, 'error')
     } finally {
@@ -244,6 +257,7 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async toggleActive(font) {
+    if (font.active && !font.managedInstall) return
     if (font.active) await get().deactivate([font.id])
     else await get().activate([font.id])
   },
@@ -260,10 +274,11 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
 
-  async refreshProvider(id) {
+  async refreshProvider(id, options) {
+    if (get().busy) return
     set({ busy: `Fetching catalogue…` })
     try {
-      const providers = await window.api.refreshProvider(id)
+      const providers = await window.api.refreshProvider(id, options)
       set({ providers })
       const info = providers.find((p) => p.id === id)
       if (info?.error) get().toast(info.error, 'error')

@@ -5,6 +5,7 @@ use crate::{
 use serde_json::{json, Value};
 use std::{
     fs,
+    io::Write,
     path::{Path, PathBuf},
 };
 
@@ -57,14 +58,21 @@ pub fn reconcile(map: &mut Value) -> Result<()> {
     let registered = {
         use winreg::{enums::HKEY_CURRENT_USER, RegKey};
         match RegKey::predef(HKEY_CURRENT_USER).open_subkey(FONT_KEY) {
-            Ok(key) => key
-                .enum_values()
-                .filter_map(|v| {
-                    v.ok()
-                        .and_then(|(name, _)| key.get_value::<String, _>(&name).ok())
-                })
-                .map(|v| path_key(Path::new(&v)))
-                .collect::<Vec<_>>(),
+            Ok(key) => {
+                let mut paths = Vec::new();
+                for entry in key.enum_values() {
+                    let (name, raw) = entry.map_err(|e| e.to_string())?;
+                    if !matches!(
+                        raw.vtype,
+                        winreg::enums::REG_SZ | winreg::enums::REG_EXPAND_SZ
+                    ) {
+                        continue;
+                    }
+                    let value: String = key.get_value(&name).map_err(|e| e.to_string())?;
+                    paths.push(path_key(Path::new(&value)));
+                }
+                paths
+            }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => vec![],
             Err(e) => return Err(e.to_string()),
         }
@@ -149,38 +157,65 @@ pub fn activate(root: &Path, map: &mut Value, font: &Value) -> Result<()> {
         extension
     ));
     let existed = dest.exists();
-    if source != dest {
-        if existed && fs::read(&dest).map_err(|e| e.to_string())? != decoded {
-            return Err("A different installed font already uses this filename".into());
-        }
-        if !existed {
-            fs::write(&dest, &decoded).map_err(|e| e.to_string())?;
+    if existed {
+        return Err("A font file already exists at the installation destination; it was not overwritten or adopted".into());
+    }
+    {
+        let mut output = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&dest)
+            .map_err(|e| e.to_string())?;
+        if let Err(error) = output.write_all(&decoded).and_then(|_| output.sync_all()) {
+            drop(output);
+            let _ = fs::remove_file(&dest);
+            return Err(error.to_string());
         }
     }
     #[cfg(windows)]
     {
         use winreg::{enums::HKEY_CURRENT_USER, RegKey};
-        let (key, _) = RegKey::predef(HKEY_CURRENT_USER)
-            .create_subkey(FONT_KEY)
-            .map_err(|e| e.to_string())?;
-        let name = registry_name(font);
-        if let Ok(previous) = key.get_value::<String, _>(&name) {
-            if path_key(Path::new(&previous)) != path_key(&dest) {
-                if !existed {
-                    let _ = fs::remove_file(&dest);
+        let registration = (|| -> Result<()> {
+            let (key, _) = RegKey::predef(HKEY_CURRENT_USER)
+                .create_subkey(FONT_KEY)
+                .map_err(|e| e.to_string())?;
+            let name = registry_name(font);
+            match key.get_raw_value(&name) {
+                Ok(_) => {
+                    return Err(
+                        "Another registration already uses this font name; it was not replaced"
+                            .into(),
+                    )
                 }
-                return Err("Another installed font already uses this registry name".into());
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.to_string()),
             }
-        }
-        if let Err(e) = key.set_value(name, &dest.to_string_lossy().as_ref()) {
-            if !existed {
-                let _ = fs::remove_file(&dest);
-            }
-            return Err(e.to_string());
+            key.set_value(name, &dest.to_string_lossy().as_ref())
+                .map_err(|e| e.to_string())
+        })();
+        if let Err(error) = registration {
+            let _ = fs::remove_file(&dest);
+            return Err(error);
         }
     }
     map[id] = json!(dest);
-    storage::write_json(&root.join("activated.json"), map)?;
+    if let Err(error) = storage::write_json(&root.join("activated.json"), map) {
+        map.as_object_mut().unwrap().remove(id);
+        #[cfg(windows)]
+        {
+            use winreg::{
+                enums::{HKEY_CURRENT_USER, KEY_WRITE},
+                RegKey,
+            };
+            if let Ok(key) =
+                RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(FONT_KEY, KEY_WRITE)
+            {
+                let _ = key.delete_value(registry_name(font));
+            }
+        }
+        let _ = fs::remove_file(&dest);
+        return Err(error);
+    }
     notify(&dest, true);
     Ok(())
 }

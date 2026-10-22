@@ -16,26 +16,41 @@ concurrency:
 jobs:
   release:
     runs-on: windows-latest
-    timeout-minutes: 30
-    env:
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 12.5.1
+          version: 11.10.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Validate updater signing key
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: node tools/check-signing.cjs
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
       - name: Set automatic release version
         run: node tools/release-version.cjs
       - run: pnpm typecheck
+      - run: cargo check --manifest-path src-tauri/Cargo.toml --locked
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - run: pnpm check:scroll
       - run: pnpm check:fuzzy
       - run: pnpm check:updates
       - name: Build Windows installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm dist:win
+      - name: Generate signed Tauri update feed
+        run: node tools/update-manifest.cjs
       - name: Create GitHub release with notes and installer
         env:
           GH_TOKEN: ${{ github.token }}
@@ -43,12 +58,13 @@ jobs:
         run: |
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $tag = "v$version"
-          $installers = @(Get-ChildItem -LiteralPath dist -Filter '*-Setup.exe')
+          $bundle = 'src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis'
+          $installers = @(Get-ChildItem -LiteralPath $bundle -Filter '*-setup.exe')
           if ($installers.Count -ne 1) { throw 'Expected exactly one Windows installer' }
-          $metadata = Join-Path $PWD 'dist/latest.yml'
-          $blockmap = "$($installers[0].FullName).blockmap"
-          if (!(Test-Path -LiteralPath $metadata) -or !(Test-Path -LiteralPath $blockmap)) { throw 'Missing auto-update metadata' }
-          gh release create $tag $installers[0].FullName $metadata $blockmap --target "$env:GITHUB_SHA" --draft --generate-notes --title "Font Hive $tag"
+          $metadata = Join-Path $bundle 'tauri-latest.json'
+          $signature = "$($installers[0].FullName).sig"
+          if (!(Test-Path -LiteralPath $metadata) -or !(Test-Path -LiteralPath $signature)) { throw 'Missing signed Tauri update metadata' }
+          gh release create $tag $installers[0].FullName $metadata $signature --target "$env:GITHUB_SHA" --draft --generate-notes --title "Font Hive $tag"
           if ($LASTEXITCODE -ne 0) { throw 'Could not create release draft' }
           gh release edit $tag --draft=false --latest
           if ($LASTEXITCODE -ne 0) { throw 'Could not publish release' }

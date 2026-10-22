@@ -88,6 +88,7 @@ interface AppState {
 }
 
 let toastSeq = 0
+let initialization: Promise<void> | null = null
 
 export const toastDuration = (tone: Toast['tone']): number => (tone === 'error' ? 7000 : 4000)
 
@@ -138,8 +139,15 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async init() {
-    const boot = await window.api.bootstrap()
-    set({
+    if (initialization) return initialization
+    initialization = (async () => {
+      const stopProgress = window.api.onProgress((progress) => set({ progress }))
+      const stopLibrary = window.api.onLibraryChanged((fonts) =>
+        set((state) => ({ fonts, providers: withCounts(state.providers, fonts) }))
+      )
+      try {
+        const boot = await window.api.bootstrap()
+        set({
       ready: true,
       fonts: boot.fonts,
       collections: boot.collections,
@@ -151,13 +159,15 @@ export const useApp = create<AppState>((set, get) => ({
       appUpdate: (get().appUpdate?.revision ?? -1) > boot.appUpdate.revision
         ? get().appUpdate
         : boot.appUpdate
-    })
-
-    window.api.onProgress((progress) => set({ progress }))
-    // Re-derive provider counts so the sidebar can never disagree with the grid.
-    window.api.onLibraryChanged((fonts) =>
-      set((state) => ({ fonts, providers: withCounts(state.providers, fonts) }))
-    )
+        })
+      } catch (error) {
+        stopProgress()
+        stopLibrary()
+        initialization = null
+        throw error
+      }
+    })()
+    return initialization
   },
 
   setFilters: (patch) => set({ filters: { ...get().filters, ...patch } }),

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Font Hive",
+  "version": "../package.json",
+  "identifier": "com.nitishmpd.fonthive",
+  "build": {
+    "beforeDevCommand": "pnpm dev:web",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "pnpm build:web",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Font Hive",
+        "width": 1440,
+        "height": 940,
+        "minWidth": 1040,
+        "minHeight": 680,
+        "decorations": false,
+        "backgroundColor": "#0a0a0a"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.bunny.net; font-src 'self' http://hive-font.localhost hive-font: https://fonts.gstatic.com https://fonts.bunny.net https://cdn.jsdelivr.net; img-src 'self' data:; connect-src ipc: http://ipc.localhost",
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.bunny.net; font-src 'self' http://hive-font.localhost hive-font: https://fonts.gstatic.com https://fonts.bunny.net https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost ws://127.0.0.1:1420"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "publisher": "Nitish",
+    "targets": [
+      "nsis"
+    ],
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "../resources/icon.ico",
+      "../resources/icon.png"
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUwQUJDN0UxQ0EwNERERDYKUldUVzNRVEs0Y2VyVU1VaURxRi9XSXcybjFKcnJjWVA5bXVYRDd1bEpSZzhoMTNRek52eVV1NjcK",
+      "endpoints": [
+        "https://github.com/NitishMPD/FontHive/releases/latest/download/tauri-latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

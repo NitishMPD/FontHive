@@ -1,6 +1,6 @@
 /**
- * Shared contract between the Electron main process, the preload bridge and the
- * React renderer. Keep this file dependency-free so both sides can import it.
+ * Shared contract between the Tauri command adapter and the React renderer.
+ * Keep this file dependency-free.
  */
 
 export type ProviderId = 'google' | 'bunny' | 'fontsource' | 'local'
@@ -57,6 +57,8 @@ export interface FontRecord {
 
   /** Absolute path once the file exists on disk (local or cached download). */
   filePath?: string
+  /** Index inside a TTC/OTC collection, zero for standalone fonts. */
+  faceIndex?: number
   /** Remote location when the face is catalogue-only. */
   downloadUrl?: string
   /** Provider-supplied preview URL (woff2) so catalogue fonts render instantly. */
@@ -225,7 +227,7 @@ export interface UpdateFontPatch {
   note?: string
 }
 
-/** The API surface exposed on `window.api` by the preload bridge. */
+/** The API surface exposed on `window.api` by the Tauri adapter. */
 export interface FontManagerApi {
   bootstrap(): Promise<Bootstrap>
 

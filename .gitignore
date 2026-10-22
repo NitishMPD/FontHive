@@ -4,3 +4,7 @@ dist/
 *.tsbuildinfo
 tools/*.built.cjs
 .DS_Store
+src-tauri/target/
+src-tauri/gen/
+.keys/
+*.key

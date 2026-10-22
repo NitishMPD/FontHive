@@ -1,11 +1,18 @@
 # Font Hive
 
-A personal font manager for Windows. Indexes every font on the machine alongside
-downloadable catalogues, renders live previews, installs and removes fonts from
-the OS, and organises everything with collections and smart filters.
+A free, open-source font manager for Windows. Indexes every font on the machine
+alongside downloadable catalogues, renders live previews, installs and removes
+fonts from the OS, and organises everything with collections and smart filters.
 
-Built with Electron, React and TypeScript, using [fontkit](https://github.com/foliojs/fontkit)
-for font parsing.
+**[Download the latest Windows installer](https://github.com/NitishMPD/FontHive/releases/latest)**
+(Windows 10/11, x64). The installer is not code-signed, so Windows SmartScreen
+may show a warning on first run: choose **More info → Run anyway**. After the
+first install, updates arrive inside the app.
+
+![Font Hive library with the variable axes panel open](docs/screenshot.png)
+
+Built with Tauri 2, Rust, React and TypeScript. Font parsing uses `ttf-parser`
+and `wuff`; Windows renders the UI through the shared Evergreen WebView2 runtime.
 
 ## Features
 
@@ -69,100 +76,123 @@ Google legacy endpoint is the fallback.
 
 ## Getting started
 
-```bash
-pnpm install
-pnpm dev          # development, with hot reload
-pnpm build        # production build into out/
-pnpm preview      # run the production build
+Requires Windows 10/11 x64, Node.js, pnpm, Rust 1.90 or newer, and Visual Studio
+C++ Build Tools with a Windows SDK. WebView2 is required to run the application.
+
+Project commands include the standard Rust installation (`%USERPROFILE%/.cargo/bin`
+or `CARGO_HOME/bin`) in their child-process PATH, including terminals opened before
+Rust was installed. If compilation reports missing `link.exe` or `cl.exe`, install
+Visual Studio Build Tools with the **Desktop development with C++** workload and
+a Windows SDK, then use its Developer PowerShell. Rust alone does not include
+Microsoft's C++ toolchain.
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm dev             # Tauri app with Vite hot reload
+pnpm typecheck       # TypeScript checks
+pnpm check:rust      # Rust type check
+pnpm test:rust       # Rust unit tests
+pnpm check:scroll    # deferred font preview behavior
+pnpm check:fuzzy     # search behavior and performance
+pnpm check:updates   # release versions and Tauri updater manifest
+pnpm check:providers # live catalogues, installable downloads and variable WOFF2
 ```
-
-Other scripts:
-
-```bash
-pnpm typecheck       # typecheck main/preload and renderer
-pnpm check:providers # verify provider catalogues and the native binding
-pnpm check:fuzzy     # typo-tolerant search: behaviour and performance
-pnpm check:updates   # automatic versions and in-app update lifecycle
-```
-
-> **Running from a terminal launched by another Electron app (such as DSH):**
-> the environment may carry `ELECTRON_RUN_AS_NODE=1`, which makes Electron start
-> as plain Node and fail with `Cannot read properties of undefined (reading
-> 'registerSchemesAsPrivileged')`. Clear it first:
-> `Remove-Item Env:ELECTRON_RUN_AS_NODE`
 
 ## Windows releases
 
-Every push to `master` (the current default branch) or `main` automatically runs
-checks, builds a Windows x64 installer,
-and publishes a GitHub Release with generated release notes. No manual tags or
-version bumps are required:
+Run `pnpm dist:win` to package a Windows x64 NSIS installer. Output is under
+`src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`. Tauri uses the
+shared Evergreen WebView2 runtime to keep the installer small; setup downloads
+WebView2 if it is missing, which requires an internet connection.
 
-```bash
-git push origin master
+The installer remains unsigned for Windows publisher identity, so SmartScreen
+may still warn. Tauri updater signatures are separate from Authenticode signing.
+Installer publisher metadata is **Nitish**; the verified Windows signer name
+requires a matching code-signing certificate.
+
+Pushes to `master` or `main` run checks, generate a stable version from the
+base version plus workflow run number, build the installer, and upload the
+installer, signature and `tauri-latest.json` to a draft GitHub Release before
+publishing it. A failed check, build or signing step prevents publication.
+The workflow uses GitHub's built-in token with `contents: write` permission.
+
+### Updater signing setup
+
+The initial signing key is stored locally at `.keys/tauri-updater.key`, which
+is ignored by git. Back it up securely. Its matching public key is in
+`src-tauri/tauri.conf.json`. Add the private key contents as the GitHub Actions
+secret `TAURI_SIGNING_PRIVATE_KEY`; add `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+if using an encrypted key. Never commit a private key or generate a new key
+for each release. The initial local key uses an empty password; project commands
+pass that explicitly so signing does not prompt. If you replace it with an
+encrypted key, set `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` to its password.
+To upload the existing private key without copying or reformatting it, run from
+the project root with an authenticated GitHub CLI:
+
+```powershell
+Get-Content -Raw .keys/tauri-updater.key | gh secret set TAURI_SIGNING_PRIVATE_KEY --repo NitishMPD/FontHive
 ```
 
-CI derives the version from `package.json`'s base version plus the workflow run
-number: base `0.1.0` produces `0.1.1`, `0.1.2`, and so on. It only changes the
-version in CI; it does not commit back to the branch. Keep the base stable between
-releases, changing its major/minor version when you want a new release series.
-GitHub automatically creates the matching `v<version>` tag at the pushed commit.
+The secret must contain the entire file, including base64 padding, without extra
+quotes or encoding. A path such as `.keys/tauri-updater.key` cannot resolve on the
+GitHub runner. An `Invalid padding` error after installer creation indicates
+invalid key encoding; replacing the secret with the unchanged file contents
+addresses that input error. Preserve the existing key pair.
+The workflow checks signing on a temporary file before compilation and stops
+early for missing/invalid keys or an incorrect password, without logging secrets.
+After correcting the secret, rerun the failed GitHub Actions job.
 
-Each release includes `Font-Hive-<version>-x64-Setup.exe`, its `.blockmap`, and
-`latest.yml` for in-app updates. Assets are uploaded to a draft before the
-release is published, so installed apps only see complete releases. Generated
-notes list merged pull requests and contributors since the previous release;
-you can edit them in GitHub after publication. If a failed run leaves a draft,
-delete that draft and its tag before rerunning the same workflow run.
+For a local signed package:
 
-No personal access token is needed: the workflow uses GitHub's built-in token
-with `contents: write` permission. GitHub Actions must be enabled, and repository
-or organisation policies must allow that permission.
+```powershell
+$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw .keys/tauri-updater.key
+pnpm dist:win
+```
 
-For a local installer build on Windows, run `pnpm dist:win`; output goes into
-`dist/`. Installation is per user and uninstalling preserves your library data.
-The installer is unsigned, so Windows may show a SmartScreen warning.
+### Migrating from Electron
+
+Close and uninstall the old Electron app, which preserves your library data,
+then install the Tauri release manually. Electron's updater feed cannot install
+the new Tauri package. Do not run both versions at the same time.
+
+The Tauri app keeps `%APPDATA%/font-hive` and stable font IDs. On first open,
+it copies existing `library.json` and `activated.json` to corresponding
+`.pre-tauri` backups before reading them. Collections, pairs, ratings, tags,
+notes, favorites, downloaded fonts and activation mappings remain in place.
+Window-local theme/sidebar preferences may reset because WebView2 uses a new
+browser profile. Keep the old installer and backups until migration is verified.
 
 ### In-app updates
 
-The installed Windows x64 app checks the public FontHive GitHub release feed
-10 seconds after launch and every six hours. An available update appears in the
-title bar and in **Settings > App updates**, where you can view release notes,
-download with progress, and choose **Restart and install**. It saves your library
-before restarting and blocks installation while library operations are running.
-Updates never install automatically when you close the app. Failed checks or
-downloads can be retried from Settings; development mode does not fetch updates.
+The installed app checks ten seconds after launch and every six hours. The title
+bar and **Settings > App updates** offer release notes, download progress, and
+**Restart and install**. Installation waits for library operations to finish and
+saves before restarting. Failed preparation keeps the downloaded update for a
+retry. Ordinary app quit never installs an update; development mode never checks.
 
-Install the first release manually; subsequent releases can update in-app.
-Verify the full path using two consecutive published versions. Download hashes
-are checked by Electron Updater; the installer is not code-signed.
+### Verification before release
+
+Run `pnpm dist:win`, then manually verify fresh installation, an Electron data
+migration, previewing TTF/OTF/TTC/WOFF/WOFF2 and variable fonts, activation in
+another running application, network folders, keyboard/window controls and an
+update between two signed versions. Installer size and native behavior remain
+unverified until those checks run.
 
 ## Layout
 
-```
-src/
-  shared/types.ts        Contract shared by main, preload and renderer
-  main/
-    index.ts             App lifecycle, IPC, hive-font:// protocol, downloads
-    store.ts             Debounced atomic JSON persistence
-    fonts/
-      scanner.ts         Directory walking with bounded concurrency
-      metadata.ts        fontkit parsing, PANOSE classification, variable axes
-      activation.ts      Windows font install/remove and native notification
-    providers/           One module per catalogue source
-  preload/index.ts       contextBridge API surface
-  renderer/src/
-    components/          Sidebar, grid, detail panel, management views
-    lib/                 Font loading, filtering and smart-rule evaluation
-```
+- `src-tauri/src/`: Rust lifecycle, library commands, storage, font parsing,
+  Windows activation, provider networking and updater.
+- `src-tauri/tauri.conf.json`: window, CSP, installer and updater settings.
+- `src/renderer/src/lib/desktop.ts`: typed frontend command/event adapter.
+- `src/renderer/src/`: existing React components, state and library logic.
+- `src/shared/types.ts`: frontend API and record contracts.
 
-Fonts are served to the renderer over a custom `hive-font://` protocol rather
-than `file://`, so the renderer keeps `contextIsolation` with no filesystem
-access of its own.
+Fonts are served through an ID-restricted `hive-font` protocol. The frontend
+has no general filesystem, shell or HTTP plugin permission.
 
 ## Data locations
 
-State lives under Electron's `userData` directory (`%APPDATA%\font-hive`):
+State stays in the original data directory (`%APPDATA%\font-hive`):
 
 - `library.json` — the indexed library, collections, folders and settings
 - `activated.json` — which faces are installed and where
@@ -180,8 +210,8 @@ with an empty library rather than failing to launch.
 
 ## Notes and limitations
 
-- Activation is implemented for Windows. macOS and Linux fall back to copying
-  into the user font directory; Linux additionally runs `fc-cache`.
+- This Tauri release targets Windows x64. macOS and Linux installers and
+  activation are not included.
 - Google and Bunny serve static instances per weight, so a *downloaded* face has
   no variable axes even when the catalogue entry advertises them. Local variable
   fonts keep full axis control.
@@ -193,3 +223,7 @@ with an empty library rather than failing to launch.
   source offers.
 - Fonts are analysed and stored locally. Catalogue requests go only to the
   provider endpoints listed above.
+
+## License
+
+[MIT](LICENSE)

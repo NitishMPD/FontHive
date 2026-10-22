@@ -1,5 +1,2 @@
 allowBuilds:
-  electron: true
-  electron-winstaller: false # Squirrel installer tooling is unused by our NSIS target.
   esbuild: true
-  koffi: true
